@@ -1,0 +1,204 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2685.4">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px Helvetica; min-height: 14.0px}
+  </style>
+</head>
+<body>
+<p class="p1">&lt;!DOCTYPE html&gt;</p>
+<p class="p1">&lt;html lang="pt-BR"&gt;</p>
+<p class="p1">&lt;head&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;meta charset="UTF-8"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;title&gt;Druid's Descent&lt;/title&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="https://cdn.tailwindcss.com"&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin&gt;&lt;/script&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script src="https://unpkg.com/@babel/standalone/babel.min.js"&gt;&lt;/script&gt;</p>
+<p class="p1">&lt;/head&gt;</p>
+<p class="p1">&lt;body class="m-0 bg-slate-950 overflow-hidden"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;div id="root"&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;script type="text/babel"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const { useState, useEffect, useCallback } = React;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>const EMOJIS = { wall: "🌲", floor: "·", player: "🧙‍♂️", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛" };</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const ENEMY_TYPES = [</p>
+<p class="p1"><span class="Apple-converted-space">      </span>{ type: 'bat', hp: 2, xp: 1, name: 'Morcego' }, { type: 'slime', hp: 2, xp: 1, name: 'Slime' },</p>
+<p class="p1"><span class="Apple-converted-space">      </span>{ type: 'goblin', hp: 4, xp: 2, name: 'Goblin' }, { type: 'orc', hp: 8, xp: 4, name: 'Orc' }</p>
+<p class="p1"><span class="Apple-converted-space">    </span>];</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>const MAP_WIDTH = 20; const MAP_HEIGHT = 15; const OBSTACLE_CHANCE = 0.15; const MAX_ENEMIES = 10; const VISION_RADIUS = 5;</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>const isVisible = (cellX, cellY, player) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const dx = cellX - player.x; const dy = cellY - player.y;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const absDx = Math.abs(dx); const absDy = Math.abs(dy);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (absDx &lt;= 1 &amp;&amp; absDy &lt;= 1) return true;<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (absDx &gt; VISION_RADIUS || absDy &gt; VISION_RADIUS) return false;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (player.facing === 'UP' &amp;&amp; dy &lt; 0 &amp;&amp; absDx &lt;= Math.abs(dy)) return true;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (player.facing === 'DOWN' &amp;&amp; dy &gt; 0 &amp;&amp; absDx &lt;= dy) return true;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (player.facing === 'LEFT' &amp;&amp; dx &lt; 0 &amp;&amp; absDy &lt;= Math.abs(dx)) return true;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>if (player.facing === 'RIGHT' &amp;&amp; dx &gt; 0 &amp;&amp; absDy &lt;= dx) return true;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>return false;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>const generateMap = (width, height, startX, startY) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const newMap = [];</p>
+<p class="p1"><span class="Apple-converted-space">      </span>for (let y = 0; y &lt; height; y++) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const row = [];</p>
+<p class="p1"><span class="Apple-converted-space">        </span>for (let x = 0; x &lt; width; x++) {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const isBorder = y === 0 || y === height - 1 || x === 0 || x === width - 1;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const isSpawnPoint = x === startX &amp;&amp; y === startY;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const isInternalWall = Math.random() &lt; OBSTACLE_CHANCE &amp;&amp; !isSpawnPoint &amp;&amp; !isBorder;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>row.push({ x, y, terrain: isBorder || isInternalWall ? 'wall' : 'floor', entity: null, explored: false });</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>newMap.push(row);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">      </span>let enemiesSpawned = 0;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>while (enemiesSpawned &lt; MAX_ENEMIES) {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const randomX = Math.floor(Math.random() * width); const randomY = Math.floor(Math.random() * height);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const targetCell = newMap[randomY][randomX]; const isSpawnPoint = randomX === startX &amp;&amp; randomY === startY;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>if (targetCell.terrain === 'floor' &amp;&amp; !targetCell.entity &amp;&amp; !isSpawnPoint) {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>targetCell.entity = { ...ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)] };</p>
+<p class="p1"><span class="Apple-converted-space">          </span>enemiesSpawned++;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>}</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}</p>
+<p class="p1"><span class="Apple-converted-space">      </span>return newMap;</p>
+<p class="p1"><span class="Apple-converted-space">    </span>};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">    </span>function DruidGame() {</p>
+<p class="p1"><span class="Apple-converted-space">      </span>const [gameState, setGameState] = useState(() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const startX = Math.floor(MAP_WIDTH / 2); const startY = Math.floor(MAP_HEIGHT / 2);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const initialMap = generateMap(MAP_WIDTH, MAP_HEIGHT, startX, startY);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const initialPlayer = { x: startX, y: startY, hp: 15, maxHp: 15, damage: 2, facing: 'DOWN', level: 1, xp: 0, statPoints: 0 };</p>
+<p class="p1"><span class="Apple-converted-space">        </span>initialMap[startY][startX].entity = { type: 'player' };</p>
+<p class="p1"><span class="Apple-converted-space">        </span>initialMap.forEach(row =&gt; row.forEach(cell =&gt; { if (isVisible(cell.x, cell.y, initialPlayer)) cell.explored = true; }));</p>
+<p class="p1"><span class="Apple-converted-space">        </span>return { map: initialMap, player: initialPlayer, log: ["Bem-vindo! Olhe ao redor com WASD."] };</p>
+<p class="p1"><span class="Apple-converted-space">      </span>});</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>const allocateStat = (stat) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>setGameState(prev =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const newPlayer = { ...prev.player };</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (stat === 'hp') { newPlayer.maxHp += 5; newPlayer.hp += 5; } else if (stat === 'damage') { newPlayer.damage += 1; }</p>
+<p class="p1"><span class="Apple-converted-space">          </span>newPlayer.statPoints -= 1;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>return { ...prev, player: newPlayer };</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">      </span>};</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>const movePlayer = useCallback((dx, dy) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>setGameState((prev) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const { map, player, log } = prev;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (player.statPoints &gt; 0) return prev;<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">          </span>let newFacing = player.facing;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (dx === 0 &amp;&amp; dy === -1) newFacing = 'UP'; else if (dx === 0 &amp;&amp; dy === 1) newFacing = 'DOWN';</p>
+<p class="p1"><span class="Apple-converted-space">          </span>else if (dx === -1 &amp;&amp; dy === 0) newFacing = 'LEFT'; else if (dx === 1 &amp;&amp; dy === 0) newFacing = 'RIGHT';</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const newPlayer = { ...player, facing: newFacing };</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const newX = player.x + dx; const newY = player.y + dy;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (newY &lt; 0 || newY &gt;= MAP_HEIGHT || newX &lt; 0 || newX &gt;= MAP_WIDTH) return prev;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>const targetCell = map[newY][newX]; const newMap = map.map(row =&gt; [...row]); let newLog = [...log];<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">          </span>const updateVision = (p) =&gt; { newMap.forEach(row =&gt; row.forEach(cell =&gt; { if (isVisible(cell.x, cell.y, p)) cell.explored = true; })); };</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (targetCell.terrain === 'wall') { updateVision(newPlayer); return { ...prev, map: newMap, player: newPlayer }; }</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (targetCell.entity &amp;&amp; targetCell.entity.type !== 'player') {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>const enemy = { ...targetCell.entity }; enemy.hp -= newPlayer.damage;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>newLog.unshift(`Você atacou o ${enemy.name} (${newPlayer.damage} dano).`);</p>
+<p class="p1"><span class="Apple-converted-space">            </span>if (enemy.hp &lt;= 0) {</p>
+<p class="p1"><span class="Apple-converted-space">              </span>newLog.unshift(`O ${enemy.name} morreu! (+${enemy.xp} XP)`);</p>
+<p class="p1"><span class="Apple-converted-space">              </span>newMap[newY][newX] = { ...targetCell, entity: null };</p>
+<p class="p1"><span class="Apple-converted-space">              </span>newPlayer.xp += enemy.xp; const xpNeeded = newPlayer.level * 5;<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">              </span>if (newPlayer.xp &gt;= xpNeeded) {</p>
+<p class="p1"><span class="Apple-converted-space">                </span>newPlayer.level += 1; newPlayer.xp -= xpNeeded; newPlayer.statPoints += 1;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>newLog.unshift(`🌟 LEVEL UP! Você chegou ao Nível ${newPlayer.level}!`);</p>
+<p class="p1"><span class="Apple-converted-space">              </span>}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>} else { newMap[newY][newX] = { ...targetCell, entity: enemy }; }</p>
+<p class="p1"><span class="Apple-converted-space">            </span>updateVision(newPlayer); return { map: newMap, player: newPlayer, log: newLog.slice(0, 6) };</p>
+<p class="p1"><span class="Apple-converted-space">          </span>}</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">          </span>newMap[player.y][player.x] = { ...newMap[player.y][player.x], entity: null };</p>
+<p class="p1"><span class="Apple-converted-space">          </span>newMap[newY][newX] = { ...newMap[newY][newX], entity: { type: 'player' } };</p>
+<p class="p1"><span class="Apple-converted-space">          </span>newPlayer.x = newX; newPlayer.y = newY;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>updateVision(newPlayer); return { map: newMap, player: newPlayer, log: newLog };</p>
+<p class="p1"><span class="Apple-converted-space">        </span>});</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}, []);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>useEffect(() =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">        </span>const handleKeyDown = (e) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if (gameState.player.statPoints &gt; 0) return;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)) e.preventDefault();</p>
+<p class="p1"><span class="Apple-converted-space">          </span>switch (e.key) {</p>
+<p class="p1"><span class="Apple-converted-space">            </span>case 'ArrowUp': case 'w': case 'W': movePlayer(0, -1); break;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>case 'ArrowDown': case 's': case 'S': movePlayer(0, 1); break;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>case 'ArrowLeft': case 'a': case 'A': movePlayer(-1, 0); break;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>case 'ArrowRight': case 'd': case 'D': movePlayer(1, 0); break;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>}</p>
+<p class="p1"><span class="Apple-converted-space">        </span>};</p>
+<p class="p1"><span class="Apple-converted-space">        </span>window.addEventListener('keydown', handleKeyDown);</p>
+<p class="p1"><span class="Apple-converted-space">        </span>return () =&gt; window.removeEventListener('keydown', handleKeyDown);</p>
+<p class="p1"><span class="Apple-converted-space">      </span>}, [movePlayer, gameState.player.statPoints]);</p>
+<p class="p2"><br></p>
+<p class="p1"><span class="Apple-converted-space">      </span>return (</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;div className="relative flex flex-col items-center justify-center min-h-screen bg-slate-950 text-slate-200 font-mono p-4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>{gameState.player.statPoints &gt; 0 &amp;&amp; (</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>&lt;div className="bg-slate-900 border-2 border-amber-500 p-6 rounded-xl text-center shadow-[0_0_30px_rgba(245,158,11,0.3)] max-w-sm"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;h2 className="text-3xl text-amber-400 mb-2 font-bold"&gt;LEVEL UP!&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;p className="text-slate-300 mb-6"&gt;Você tem {gameState.player.statPoints} ponto(s).&lt;/p&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div className="flex flex-col gap-3"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>&lt;button onClick={() =&gt; allocateStat('hp')} className="bg-slate-800 border border-emerald-500 text-emerald-400 py-3 px-4 rounded"&gt;+5 HP Máximo&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>&lt;button onClick={() =&gt; allocateStat('damage')} className="bg-slate-800 border border-red-500 text-red-400 py-3 px-4 rounded"&gt;+1 Dano&lt;/button&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>)}</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;h1 className="text-emerald-500 text-3xl mb-4 font-bold tracking-widest"&gt;DRUID's DESCENT&lt;/h1&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;div className="flex flex-col xl:flex-row gap-6"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div className="border-4 border-slate-700 bg-black p-2 rounded-lg shadow-2xl"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>{gameState.map.map((row, y) =&gt; (</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div key={y} className="flex"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>{row.map((cell, x) =&gt; {</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>const isCurrentlyVisible = isVisible(x, y, gameState.player); const isExplored = cell.explored;</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>let content = "⬛"; let extraClass = "opacity-0";<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>if (isCurrentlyVisible) { content = cell.entity ? EMOJIS[cell.entity.type] : EMOJIS[cell.terrain]; extraClass = "opacity-100"; }<span class="Apple-converted-space"> </span></p>
+<p class="p1"><span class="Apple-converted-space">                    </span>else if (isExplored) { content = EMOJIS[cell.terrain]; extraClass = "opacity-30 grayscale"; }</p>
+<p class="p1"><span class="Apple-converted-space">                    </span>return &lt;div key={`${x}-${y}`} className={`w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-xl md:text-2xl select-none transition-all duration-300 ${extraClass}`}&gt;{content}&lt;/div&gt;;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>})}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>))}</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;div className="flex flex-col w-full xl:w-80 gap-4"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>&lt;div className="bg-slate-900 border-2 border-slate-700 p-4 rounded-lg"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;h2 className="text-emerald-400 font-bold mb-2 uppercase border-b border-slate-700 pb-1"&gt;Status&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div className="flex justify-between items-center text-lg mb-1"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>&lt;span&gt;{EMOJIS.player} Nvl. {gameState.player.level}&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>&lt;span className="text-red-400 font-bold"&gt;HP: {gameState.player.hp}/{gameState.player.maxHp}&lt;/span&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div className="w-full bg-slate-800 rounded-full h-2.5 mb-2"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>&lt;div className="bg-blue-500 h-2.5 rounded-full transition-all" style={{ width: `${(gameState.player.xp / (gameState.player.level * 5)) * 100}%` }}&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;div className="text-sm text-slate-400 flex justify-between"&gt;&lt;span&gt;Dano: {gameState.player.damage}&lt;/span&gt;&lt;span&gt;Visão: {gameState.player.facing}&lt;/span&gt;&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>&lt;div className="bg-slate-900 border-2 border-slate-700 p-4 rounded-lg flex-1 overflow-hidden"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;h2 className="text-slate-400 font-bold mb-2 uppercase border-b border-slate-700 pb-1"&gt;Diário&lt;/h2&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;ul className="text-sm space-y-2"&gt;</p>
+<p class="p1"><span class="Apple-converted-space">                  </span>{gameState.log.map((msg, index) =&gt; (&lt;li key={index} className={`${index === 0 ? 'text-slate-100 font-semibold' : 'text-slate-500'}`}&gt;{index === 0 ? '&gt; ' : ''}{msg}&lt;/li&gt;))}</p>
+<p class="p1"><span class="Apple-converted-space">                </span>&lt;/ul&gt;</p>
+<p class="p1"><span class="Apple-converted-space">              </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">            </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">          </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">        </span>&lt;/div&gt;</p>
+<p class="p1"><span class="Apple-converted-space">      </span>);</p>
+<p class="p1"><span class="Apple-converted-space">    </span>}</p>
+<p class="p1"><span class="Apple-converted-space">    </span>const root = ReactDOM.createRoot(document.getElementById("root"));</p>
+<p class="p1"><span class="Apple-converted-space">    </span>root.render(&lt;DruidGame /&gt;);</p>
+<p class="p1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</p>
+<p class="p1">&lt;/body&gt;</p>
+<p class="p1">&lt;/html&gt;</p>
+</body>
+</html>

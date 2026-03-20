@@ -3,15 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Endless Dungeon</title>
+  <title>Lost in Blackwood - Survival</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { margin: 0; background-color: #020617; overflow-x: hidden; color: #e2e8f0; }
+    body { margin: 0; background-color: #020617; overflow-x: hidden; color: #e2e8f0; font-family: 'Courier New', Courier, monospace; }
     html { overflow: hidden; touch-action: none; }
-    .pixel-shadow { shadow-[0_0_15px_rgba(0,0,0,0.8)] }
+    .glow-red { box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+    .glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #020617; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
   </style>
 </head>
 <body>
@@ -19,8 +23,11 @@
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 
-    // EMOJIS ATUALIZADOS: Personagem alterado para menino '👦'
-    const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", stairs: "🪜" };
+    const EMOJIS = { 
+      wall: "🌲", floor: "·", player: "👦", goblin: "👹", 
+      slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", 
+      stairs: "🪜", fruit: "🍎" 
+    };
     
     const ENEMY_BASE = [
       { type: 'bat', hp: 2, xp: 1, name: 'Morcego' },
@@ -45,47 +52,54 @@
 
     const generateLevel = (floor, startX, startY) => {
       const newMap = [];
-      const obstacleChance = 0.15 + (floor * 0.01);
-      
+      const obstacleChance = 0.16;
+      const fruitChance = 0.04; // 4% de chance de fruta em cada piso vazio
+
       for (let y = 0; y < MAP_HEIGHT; y++) {
         const row = [];
         for (let x = 0; x < MAP_WIDTH; x++) {
           const isBorder = y === 0 || y === MAP_HEIGHT - 1 || x === 0 || x === MAP_WIDTH - 1;
           const isSpawn = x === startX && y === startY;
-          const isWall = (Math.random() < obstacleChance && !isSpawn && !isBorder) || isBorder;
-          row.push({ x, y, terrain: isWall ? 'wall' : 'floor', entity: null, explored: false });
+          let terrain = isBorder || (Math.random() < obstacleChance && !isSpawn) ? 'wall' : 'floor';
+          
+          // Gerar fruta
+          let entity = null;
+          if (terrain === 'floor' && !isSpawn && Math.random() < fruitChance) {
+            entity = { type: 'fruit' };
+          }
+
+          row.push({ x, y, terrain, entity, explored: false });
         }
         newMap.push(row);
       }
 
+      // Escada
       let stairsPlaced = false;
       while(!stairsPlaced) {
         let sx = Math.floor(Math.random() * (MAP_WIDTH-2)) + 1;
         let sy = Math.floor(Math.random() * (MAP_HEIGHT-2)) + 1;
-        if(newMap[sy][sx].terrain === 'floor' && Math.abs(sx - startX) > 10) {
+        if(newMap[sy][sx].terrain === 'floor' && Math.abs(sx - startX) > 12) {
           newMap[sy][sx].terrain = 'stairs';
+          newMap[sy][sx].entity = null; // Limpa fruta se houver
           stairsPlaced = true;
         }
       }
 
+      // Inimigos
       let enemiesToSpawn = 5 + Math.floor(floor / 2);
       while (enemiesToSpawn > 0) {
         let rx = Math.floor(Math.random() * (MAP_WIDTH-2)) + 1;
         let ry = Math.floor(Math.random() * (MAP_HEIGHT-2)) + 1;
         if (newMap[ry][rx].terrain === 'floor' && !newMap[ry][rx].entity && !(rx === startX && ry === startY)) {
           const base = ENEMY_BASE[Math.floor(Math.random() * Math.min(floor, ENEMY_BASE.length))];
-          newMap[ry][rx].entity = { 
-            ...base, 
-            hp: base.hp + Math.floor(floor * 1.5),
-            maxHp: base.hp + Math.floor(floor * 1.5)
-          };
+          newMap[ry][rx].entity = { ...base, hp: base.hp + floor, maxHp: base.hp + floor };
           enemiesToSpawn--;
         }
       }
       return newMap;
     };
 
-    function DruidGame() {
+    function App() {
       const [floor, setFloor] = useState(1);
       const [gameState, setGameState] = useState(() => {
         const startX = 2; const startY = 2;
@@ -93,8 +107,7 @@
         const player = { x: startX, y: startY, hp: 20, maxHp: 20, damage: 3, facing: 'DOWN', level: 1, xp: 0, statPoints: 0 };
         initialMap[startY][startX].entity = { type: 'player' };
         initialMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, player)) c.explored = true; }));
-        // TÍTULO ATUALIZADO NO LOG
-        return { map: initialMap, player, log: ["Lost in Blackwood: A floresta escura espera por você."] };
+        return { map: initialMap, player, log: ["Você acordou no meio de Blackwood..."] };
       });
 
       const nextFloor = useCallback(() => {
@@ -103,21 +116,14 @@
         const startX = 2; const startY = 2;
         const newMap = generateLevel(newFloorNum, startX, startY);
         const updatedPlayer = { ...gameState.player, x: startX, y: startY };
-        
         newMap[startY][startX].entity = { type: 'player' };
         newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, updatedPlayer)) c.explored = true; }));
-        
-        setGameState(prev => ({
-          ...prev,
-          map: newMap,
-          player: updatedPlayer,
-          log: [`Descendo para o Nível ${newFloorNum}...`, ...prev.log].slice(0, 5)
-        }));
+        setGameState(prev => ({ ...prev, map: newMap, player: updatedPlayer, log: [`Andar ${newFloorNum}: O ar parece mais pesado aqui.`, ...prev.log] }));
       }, [floor, gameState.player]);
 
       const movePlayer = useCallback((dx, dy) => {
         setGameState((prev) => {
-          if (prev.player.statPoints > 0 || prev.player.hp <= 0) return prev;
+          if (prev.player.hp <= 0 || prev.player.statPoints > 0) return prev;
           let newFacing = prev.player.facing;
           if (dx === 0 && dy === -1) newFacing = 'UP'; else if (dx === 0 && dy === 1) newFacing = 'DOWN';
           else if (dx === -1 && dy === 0) newFacing = 'LEFT'; else if (dx === 1 && dy === 0) newFacing = 'RIGHT';
@@ -126,44 +132,42 @@
           if (newY < 0 || newY >= MAP_HEIGHT || newX < 0 || newX >= MAP_WIDTH) return prev;
 
           const targetCell = prev.map[newY][newX];
-          
-          if (targetCell.terrain === 'stairs') {
-            setTimeout(nextFloor, 10);
-            return prev;
-          }
+          if (targetCell.terrain === 'stairs') { setTimeout(nextFloor, 10); return prev; }
 
           const newMap = prev.map.map(row => [...row]);
           let newLog = [...prev.log];
           let newPlayer = { ...prev.player, facing: newFacing };
+
+          // Mecânica de Fruta
+          if (targetCell.entity && targetCell.entity.type === 'fruit') {
+            newPlayer.hp = Math.min(newPlayer.hp + 5, newPlayer.maxHp);
+            newLog.unshift("🍎 Você comeu uma maçã e recuperou 5 HP!");
+            targetCell.entity = null;
+          }
 
           if (targetCell.terrain === 'wall') {
              newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
              return { ...prev, map: newMap, player: newPlayer };
           }
 
-          if (targetCell.entity) {
+          if (targetCell.entity && targetCell.entity.type !== 'player') {
             const enemy = { ...targetCell.entity };
             enemy.hp -= newPlayer.damage;
-            newLog.unshift(`Você bateu no ${enemy.name}!`);
-            
+            newLog.unshift(`Você atacou o ${enemy.name}!`);
             if (enemy.hp > 0) {
-              const enemyDmg = Math.floor(floor * 0.8) + 1;
+              const enemyDmg = Math.floor(floor * 0.7) + 1;
               newPlayer.hp -= enemyDmg;
               newLog.unshift(`O ${enemy.name} revidou: -${enemyDmg} HP!`);
               newMap[newY][newX].entity = enemy;
             } else {
               newMap[newY][newX].entity = null;
               newPlayer.xp += enemy.xp;
-              newLog.unshift(`Inimigo derrotado! +${enemy.xp} XP`);
-              if (newPlayer.xp >= newPlayer.level * 5) { 
-                newPlayer.level++; 
-                newPlayer.statPoints++; 
-              }
+              newLog.unshift(`Derrotou o ${enemy.name}! +${enemy.xp} XP`);
+              if (newPlayer.xp >= newPlayer.level * 5) { newPlayer.level++; newPlayer.statPoints++; }
             }
-            if(newPlayer.hp <= 0) newLog.unshift("⚠️ FIM DE JOGO! Recarregue a página para tentar novamente.");
-            
+            if(newPlayer.hp <= 0) newLog.unshift("💀 FIM DE JOGO!");
             newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
-            return { ...prev, map: newMap, player: newPlayer, log: newLog.slice(0, 5) };
+            return { ...prev, map: newMap, player: newPlayer, log: newLog.slice(0, 6) };
           }
 
           newMap[prev.player.y][prev.player.x].entity = null;
@@ -176,7 +180,7 @@
 
       useEffect(() => {
         const handleKeyDown = (e) => {
-          const keys = { w: [0,-1], s: [0,1], a: [-1,0], d: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0] };
+          const keys = { w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0] };
           if (keys[e.key]) { e.preventDefault(); movePlayer(...keys[e.key]); }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -184,88 +188,121 @@
       }, [movePlayer]);
 
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen w-full bg-slate-950 font-mono p-2 select-none">
-          <div className="mb-4 text-center">
-            {/* TÍTULO ATUALIZADO AQUI */}
-            <h1 className="text-emerald-500 text-2xl font-black italic tracking-tighter">LOST IN BLACKWOOD</h1>
-            <span className="text-slate-500 text-xs uppercase tracking-[0.3em]">Nível da Floresta: {floor}</span>
-          </div>
-          
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
-            <div className="border-4 border-slate-800 bg-black p-1 rounded-xl shadow-2xl overflow-hidden overflow-x-auto max-w-full">
+        <div className="flex flex-col items-center justify-center min-h-screen w-full bg-slate-950 p-4 select-none">
+          <header className="mb-6 text-center">
+            <h1 className="text-emerald-400 text-3xl font-black tracking-tighter italic">LOST IN BLACKWOOD</h1>
+            <div className="text-[10px] text-slate-500 uppercase tracking-[0.5em] mt-1">Nível de Exploração: {floor}</div>
+          </header>
+
+          <div className="flex flex-col xl:flex-row gap-8 items-start max-w-7xl">
+            {/* MAPA PRINCIPAL */}
+            <div className="bg-black p-1 border-4 border-slate-900 rounded-2xl glow-emerald shadow-2xl overflow-hidden overflow-x-auto">
               {gameState.map.map((row, y) => (
                 <div key={y} className="flex min-w-max">
                   {row.map((cell, x) => {
                     const visible = isVisible(x, y, gameState.player);
                     let content = "⬛"; let op = "opacity-0";
-                    if (visible) { content = cell.entity ? EMOJIS[cell.entity.type] : EMOJIS[cell.terrain]; op = "opacity-100"; }
-                    else if (cell.explored) { content = EMOJIS[cell.terrain]; op = "opacity-20 grayscale"; }
-                    return <div key={`${x}-${y}`} className={`w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center text-xl transition-all duration-300 ${op}`}>{content}</div>;
+                    if (visible) { 
+                      content = cell.entity ? EMOJIS[cell.entity.type] : EMOJIS[cell.terrain]; 
+                      op = "opacity-100"; 
+                    } else if (cell.explored) { 
+                      content = EMOJIS[cell.terrain]; 
+                      op = "opacity-20 grayscale"; 
+                    }
+                    return <div key={`${x}-${y}`} className={`w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-xl transition-all duration-300 ${op}`}>{content}</div>;
                   })}
                 </div>
               ))}
             </div>
 
-            <div className="w-full lg:w-72 flex flex-col gap-4 h-full">
-              <div className="bg-slate-900 border-2 border-slate-800 p-4 rounded-xl shadow-xl">
-                <div className="flex justify-between items-center mb-4 text-sm">
-                  <span className="text-emerald-400 font-bold">Nvl {gameState.player.level}</span>
-                  <span className="text-slate-500 uppercase tracking-wider text-xs">{EMOJIS.player} SOBREVIVENTE</span>
+            {/* PAINEL LATERAL */}
+            <div className="w-full xl:w-80 flex flex-col gap-6">
+              {/* STATUS */}
+              <div className="bg-slate-900 border-b-4 border-emerald-900 p-5 rounded-2xl shadow-xl">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sobrevivente</span>
+                  <span className="text-emerald-400 text-sm font-black">NVL {gameState.player.level}</span>
                 </div>
-                
                 <div className="mb-4">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-red-400 uppercase font-bold tracking-tighter">Integridade (HP)</span>
-                    <span className="font-bold text-slate-300">{gameState.player.hp} / {gameState.player.maxHp}</span>
+                  <div className="w-full bg-black/50 h-4 rounded-full border border-slate-800 p-0.5">
+                    <div className="bg-gradient-to-r from-red-800 to-red-500 h-full rounded-full transition-all duration-500" style={{ width: `${(gameState.player.hp / gameState.player.maxHp) * 100}%` }}></div>
                   </div>
-                  <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 shadow-inner">
-                    <div className="bg-red-600 h-full transition-all duration-500 ease-out" style={{ width: `${(gameState.player.hp / gameState.player.maxHp) * 100}%` }}></div>
+                  <div className="flex justify-between text-[10px] mt-1 text-slate-500 font-bold">
+                    <span>HP: {gameState.player.hp} / {gameState.player.maxHp}</span>
+                    <span>XP: {gameState.player.xp}</span>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[10px] uppercase font-bold text-slate-500">
-                  <div className="bg-black/40 p-2 rounded border border-slate-800">Força de Atq: <span className="text-orange-400">⚔️ {gameState.player.damage}</span></div>
-                  <div className="bg-black/40 p-2 rounded border border-slate-800">Experiência: <span className="text-blue-400">✨ {gameState.player.xp}</span></div>
+                <div className="flex gap-2">
+                   <div className="bg-black/30 flex-1 p-2 rounded-lg border border-slate-800 text-center">
+                      <div className="text-[9px] text-slate-500">ATAQUE</div>
+                      <div className="text-orange-400 font-bold text-sm">⚔️ {gameState.player.damage}</div>
+                   </div>
+                   <div className="bg-black/30 flex-1 p-2 rounded-lg border border-slate-800 text-center">
+                      <div className="text-[9px] text-slate-500">DEFESA</div>
+                      <div className="text-blue-400 font-bold text-sm">🛡️ {floor}</div>
+                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-900 border-2 border-slate-800 p-2 rounded-xl">
-                 <div className="bg-black p-1 rounded grid" style={{ gridTemplateColumns: `repeat(${MAP_WIDTH}, 1fr)` }}>
+              {/* MINI-MAPA MELHORADO */}
+              <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-inner">
+                <div className="text-[9px] text-slate-500 mb-2 font-bold uppercase flex justify-between">
+                   <span>Radar de Blackwood</span>
+                   <span className="text-emerald-500 animate-pulse">● LIVE</span>
+                </div>
+                <div className="bg-black/80 rounded-lg p-2 flex justify-center border border-emerald-900/30">
+                   <div className="grid gap-[1px]" style={{ gridTemplateColumns: `repeat(${MAP_WIDTH}, 1fr)` }}>
                     {gameState.map.map((row, y) => row.map((cell, x) => {
                         let color = "bg-transparent";
+                        const visible = isVisible(x, y, gameState.player);
                         if (cell.explored) {
-                          if (x === gameState.player.x && y === gameState.player.y) color = "bg-emerald-400";
+                          if (x === gameState.player.x && y === gameState.player.y) color = "bg-emerald-400 shadow-[0_0_5px_#34d399]";
                           else if (cell.terrain === 'stairs') color = "bg-amber-400 animate-pulse";
+                          else if (cell.entity && cell.entity.type !== 'fruit' && visible) color = "bg-red-500 animate-pulse"; // MONSTRO VISTO
+                          else if (cell.entity && cell.entity.type === 'fruit' && visible) color = "bg-red-300"; // FRUTA VISTA
                           else if (cell.terrain === 'wall') color = "bg-slate-800";
                           else color = "bg-slate-900";
                         }
-                        return <div key={`${x}-${y}`} className={`w-1.5 h-1.5 ${color} rounded-[1px]`}></div>;
+                        return <div key={`${x}-${y}`} className={`w-1.5 h-1.5 md:w-2 md:h-2 ${color} rounded-[1px]`}></div>;
                     }))}
-                 </div>
+                   </div>
+                </div>
               </div>
 
-              <div className="bg-slate-900 border-2 border-slate-800 p-3 rounded-xl h-32 overflow-hidden max-h-32">
-                <div className="text-[10px] space-y-1">
-                  {gameState.log.map((m, i) => <div key={i} className={i === 0 ? "text-emerald-300 font-semibold" : "text-slate-600"}>{i === 0 ? "» " : ""}{m}</div>)}
-                </div>
+              {/* LOG */}
+              <div className="bg-black/40 border-l-2 border-emerald-500 p-4 rounded-r-xl h-32 overflow-hidden overflow-y-auto">
+                {gameState.log.map((m, i) => (
+                  <div key={i} className={`text-[10px] mb-1.5 ${i === 0 ? "text-emerald-200" : "text-slate-600"}`}>
+                    {i === 0 ? "» " : ""}{m}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
+          {/* LEVEL UP MODAL */}
           {gameState.player.statPoints > 0 && (
-            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6">
-              <div className="bg-slate-900 border-2 border-amber-500 p-6 rounded-2xl text-center shadow-2xl max-w-xs border-dashed">
-                <h2 className="text-xl text-amber-500 font-bold mb-1 uppercase tracking-tight">Sobrevivência</h2>
-                <div className="text-[10px] text-slate-500 mb-5">ESCOLHA UMA MELHORIA</div>
-                <button onClick={() => setGameState(p => ({...p, player: {...p.player, maxHp: p.player.maxHp+10, hp: p.player.hp+10, statPoints: p.player.statPoints-1}}))} className="w-full mb-3 bg-emerald-900/20 border border-emerald-500 text-emerald-400 py-3 rounded-lg hover:bg-emerald-500/10 text-xs font-bold">🌿 Resistência (+10 HP Máx)</button>
-                <button onClick={() => setGameState(p => ({...p, player: {...p.player, damage: p.player.damage+2, statPoints: p.player.statPoints-1}}))} className="w-full bg-orange-900/20 border border-orange-500 text-orange-400 py-3 rounded-lg hover:bg-orange-500/10 text-xs font-bold">🔥 Ferocidade (+2 Dano de Atq)</button>
+            <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-slate-900 border-2 border-amber-500 p-8 rounded-3xl text-center max-w-xs w-full glow-red">
+                <h2 className="text-2xl text-amber-500 font-black mb-1 uppercase italic italic tracking-tighter">Level Up!</h2>
+                <p className="text-slate-500 text-[10px] mb-6 tracking-widest">SINTA O CRESCIMENTO DA FLORESTA</p>
+                <div className="flex flex-col gap-4">
+                  <button onClick={() => setGameState(p => ({...p, player: {...p.player, maxHp: p.player.maxHp+10, hp: p.player.hp+10, statPoints: p.player.statPoints-1}}))} 
+                    className="bg-emerald-950/30 border border-emerald-500 text-emerald-400 py-4 rounded-xl hover:bg-emerald-500 hover:text-white transition-all font-bold">
+                    🌿 Vigor (+10 HP)
+                  </button>
+                  <button onClick={() => setGameState(p => ({...p, player: {...p.player, damage: p.player.damage+2, statPoints: p.player.statPoints-1}}))} 
+                    className="bg-orange-950/30 border border-orange-500 text-orange-400 py-4 rounded-xl hover:bg-orange-500 hover:text-white transition-all font-bold">
+                    ⚔️ Fúria (+2 Dano)
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       );
     }
-    ReactDOM.createRoot(document.getElementById("root")).render(<DruidGame />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
   </script>
 </body>
 </html>

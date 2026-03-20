@@ -1,120 +1,235 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Druid's Descent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Druid's Descent - Pro</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { margin: 0; background-color: #020617; overflow-x: hidden; color: #e2e8f0; }
+    html { overflow: hidden; touch-action: none; }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-200 font-mono overflow-hidden">
+<body>
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
 
     const EMOJIS = { wall: "🌲", floor: "·", player: "🧙‍♂️", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", stairs: "🪜" };
-    const MAP_W = 20; const MAP_H = 12;
+    const ENEMY_TYPES = [
+      { type: 'bat', hp: 2, xp: 1, name: 'Morcego' }, { type: 'slime', hp: 2, xp: 1, name: 'Slime' },
+      { type: 'goblin', hp: 4, xp: 2, name: 'Goblin' }, { type: 'orc', hp: 8, xp: 4, name: 'Orc' }
+    ];
 
-    const generateMap = (floor) => {
-      let map = [];
-      for (let y = 0; y < MAP_H; y++) {
-        let row = [];
-        for (let x = 0; x < MAP_W; x++) {
-          const isWall = x===0 || y===0 || x===MAP_W-1 || y===MAP_H-1 || Math.random() < 0.15;
-          row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
-        }
-        map.push(row);
-      }
-      // Escada
-      map[MAP_H-2][MAP_W-2].t = 'stairs';
-      // Inimigos
-      for(let i=0; i<5; i++) {
-        let rx = Math.floor(Math.random()*MAP_W), ry = Math.floor(Math.random()*MAP_H);
-        if(map[ry][rx].t === 'floor') map[ry][rx].e = { n: 'Monstro', h: 3 + floor };
-      }
-      return map;
+    const MAP_WIDTH = 20; const MAP_HEIGHT = 12; const OBSTACLE_CHANCE = 0.15; const MAX_ENEMIES = 8; const VISION_RADIUS = 5;
+
+    const isVisible = (cellX, cellY, player) => {
+      const dx = cellX - player.x; const dy = cellY - player.y;
+      const absDx = Math.abs(dx); const absDy = Math.abs(dy);
+      if (absDx <= 1 && absDy <= 1) return true; 
+      if (absDx > VISION_RADIUS || absDy > VISION_RADIUS) return false;
+      if (player.facing === 'UP' && dy < 0 && absDx <= Math.abs(dy)) return true;
+      if (player.facing === 'DOWN' && dy > 0 && absDx <= dy) return true;
+      if (player.facing === 'LEFT' && dx < 0 && absDy <= Math.abs(dx)) return true;
+      if (player.facing === 'RIGHT' && dx > 0 && absDy <= dx) return true;
+      return false;
     };
 
-    function App() {
+    const generateMap = (floor, width, height, startX, startY) => {
+      const newMap = [];
+      for (let y = 0; y < height; y++) {
+        const row = [];
+        for (let x = 0; x < width; x++) {
+          const isBorder = y === 0 || y === height - 1 || x === 0 || x === width - 1;
+          const isSpawnPoint = x === startX && y === startY;
+          const isInternalWall = Math.random() < OBSTACLE_CHANCE && !isSpawnPoint && !isBorder;
+          row.push({ x, y, terrain: isBorder || isInternalWall ? 'wall' : 'floor', entity: null, explored: false });
+        }
+        newMap.push(row);
+      }
+      
+      // Adicionar Escada
+      let stairsPlaced = false;
+      while(!stairsPlaced) {
+        let sx = Math.floor(Math.random() * (width-2)) + 1;
+        let sy = Math.floor(Math.random() * (height-2)) + 1;
+        if(newMap[sy][sx].terrain === 'floor' && Math.abs(sx - startX) > 8) {
+          newMap[sy][sx].terrain = 'stairs';
+          stairsPlaced = true;
+        }
+      }
+
+      let enemiesSpawned = 0;
+      while (enemiesSpawned < MAX_ENEMIES) {
+        const randomX = Math.floor(Math.random() * width); const randomY = Math.floor(Math.random() * height);
+        const targetCell = newMap[randomY][randomX];
+        if (targetCell.terrain === 'floor' && !targetCell.entity && !(randomX === startX && randomY === startY)) {
+          const enemy = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+          targetCell.entity = { ...enemy, hp: enemy.hp + floor, maxHp: enemy.hp + floor };
+          enemiesSpawned++;
+        }
+      }
+      return newMap;
+    };
+
+    function DruidGame() {
       const [floor, setFloor] = useState(1);
-      const [p, setP] = useState({ x: 2, y: 2, hp: 20, max: 20, atk: 2, xp: 0 });
-      const [map, setMap] = useState(() => generateMap(1));
-      const [log, setLog] = useState(["Andar 1 iniciado!"]);
+      const [gameState, setGameState] = useState(() => {
+        const startX = 2; const startY = 2;
+        const initialMap = generateMap(1, MAP_WIDTH, MAP_HEIGHT, startX, startY);
+        const initialPlayer = { x: startX, y: startY, hp: 20, maxHp: 20, damage: 3, facing: 'DOWN', level: 1, xp: 0, statPoints: 0 };
+        initialMap[startY][startX].entity = { type: 'player' };
+        initialMap.forEach(row => row.forEach(cell => { if (isVisible(cell.x, cell.y, initialPlayer)) cell.explored = true; }));
+        return { map: initialMap, player: initialPlayer, log: ["Bem-vindo ao Andar 1!"] };
+      });
 
-      const move = (dx, dy) => {
-        const nx = p.x + dx, ny = p.y + dy;
-        const target = map[ny][nx];
+      const nextFloor = useCallback(() => {
+        const newFloor = floor + 1;
+        setFloor(newFloor);
+        const startX = 2; const startY = 2;
+        const newMap = generateMap(newFloor, MAP_WIDTH, MAP_HEIGHT, startX, startY);
+        const player = { ...gameState.player, x: startX, y: startY };
+        newMap[startY][startX].entity = { type: 'player' };
+        newMap.forEach(row => row.forEach(cell => { if (isVisible(cell.x, cell.y, player)) cell.explored = true; }));
+        setGameState(prev => ({ ...prev, map: newMap, player, log: [`Descendo para o Andar ${newFloor}...`, ...prev.log] }));
+      }, [floor, gameState.player]);
 
-        if (target.t === 'stairs') {
-          setFloor(f => f + 1);
-          setMap(generateMap(floor + 1));
-          setP(prev => ({ ...prev, x: 2, y: 2 }));
-          setLog(prev => ["Você desceu de andar!", ...prev]);
-          return;
-        }
+      const movePlayer = useCallback((dx, dy) => {
+        setGameState((prev) => {
+          if (prev.player.hp <= 0 || prev.player.statPoints > 0) return prev;
+          let newFacing = prev.player.facing;
+          if (dx === 0 && dy === -1) newFacing = 'UP'; else if (dx === 0 && dy === 1) newFacing = 'DOWN';
+          else if (dx === -1 && dy === 0) newFacing = 'LEFT'; else if (dx === 1 && dy === 0) newFacing = 'RIGHT';
 
-        if (target.t === 'wall') return;
+          const newX = prev.player.x + dx; const newY = prev.player.y + dy;
+          if (newY < 0 || newY >= MAP_HEIGHT || newX < 0 || newX >= MAP_WIDTH) return prev;
 
-        if (target.e) {
-          target.e.h -= p.atk;
-          let newLog = [`Você atacou o monstro!`];
-          if (target.e.h <= 0) {
-            target.e = null;
-            newLog.push("Inimigo derrotado!");
-          } else {
-            p.hp -= floor;
-            newLog.push(`O monstro revidou: -${floor} HP`);
+          const targetCell = prev.map[newY][newX];
+          if (targetCell.terrain === 'stairs') { setTimeout(nextFloor, 10); return prev; }
+
+          const newMap = prev.map.map(row => [...row]);
+          let newLog = [...prev.log];
+          let newPlayer = { ...prev.player, facing: newFacing };
+
+          if (targetCell.terrain === 'wall') {
+            newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
+            return { ...prev, map: newMap, player: newPlayer };
           }
-          setLog(prev => [...newLog, ...prev].slice(0, 5));
-          setMap([...map]);
-          return;
-        }
 
-        setP(prev => ({ ...prev, x: nx, y: ny }));
-      };
+          if (targetCell.entity && targetCell.entity.type !== 'player') {
+            const enemy = { ...targetCell.entity };
+            enemy.hp -= newPlayer.damage;
+            newLog.unshift(`Ataque no ${enemy.name}!`);
+            if (enemy.hp <= 0) {
+              newMap[newY][newX].entity = null;
+              newPlayer.xp += enemy.xp;
+              if (newPlayer.xp >= newPlayer.level * 5) { newPlayer.level++; newPlayer.statPoints++; }
+            } else {
+              newMap[newY][newX].entity = enemy;
+              const dmg = Math.floor(floor * 0.5) + 1;
+              newPlayer.hp -= dmg;
+              newLog.unshift(`Revidou: -${dmg} HP!`);
+            }
+            newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
+            return { ...prev, map: newMap, player: newPlayer, log: newLog.slice(0, 5) };
+          }
+
+          newMap[prev.player.y][prev.player.x].entity = null;
+          newMap[newY][newX].entity = { type: 'player' };
+          newPlayer.x = newX; newPlayer.y = newY;
+          newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
+          return { ...prev, map: newMap, player: newPlayer, log: newLog };
+        });
+      }, [floor, nextFloor]);
 
       useEffect(() => {
-        const h = (e) => {
-          if(e.key === 'w') move(0,-1); if(e.key === 's') move(0,1);
-          if(e.key === 'a') move(-1,0); if(e.key === 'd') move(1,0);
+        const handleKeyDown = (e) => {
+          const keys = { w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0] };
+          if (keys[e.key]) { e.preventDefault(); movePlayer(...keys[e.key]); }
         };
-        window.addEventListener('keydown', h);
-        return () => window.removeEventListener('keydown', h);
-      }, [p, map]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [movePlayer]);
 
       return (
-        <div className="flex flex-col items-center justify-center h-screen gap-4">
-          <div className="text-emerald-500 font-bold text-xl">DRUID'S DESCENT - ANDAR {floor}</div>
-          <div className="flex gap-4 p-4 bg-slate-900 border-2 border-slate-800 rounded-xl">
-            <div className="bg-black p-2 border border-slate-700">
-              {map.map((row, y) => (
+        <div className="flex flex-col items-center justify-center min-h-screen w-full bg-slate-950 text-slate-200 font-mono p-2 md:p-6 overflow-y-auto">
+          <h1 className="text-emerald-500 text-xl md:text-3xl mb-1 font-bold tracking-widest text-center">DRUID'S DESCENT</h1>
+          <p className="text-slate-500 text-[10px] mb-4 uppercase tracking-[0.4em]">Subsolo: {floor}</p>
+          
+          <div className="flex flex-col lg:flex-row gap-6 w-full max-w-6xl items-start justify-center">
+            {/* MAPA PRINCIPAL */}
+            <div className="border-4 border-slate-800 bg-black p-1 rounded-xl shadow-2xl mx-auto overflow-hidden">
+              {gameState.map.map((row, y) => (
                 <div key={y} className="flex">
-                  {row.map((c, x) => (
-                    <div key={x} className="w-8 h-8 flex items-center justify-center text-xl">
-                      {p.x === x && p.y === y ? EMOJIS.player : (c.e ? EMOJIS.goblin : EMOJIS[c.t])}
-                    </div>
-                  ))}
+                  {row.map((cell, x) => {
+                    const visible = isVisible(x, y, gameState.player);
+                    let content = "⬛"; let op = "opacity-0";
+                    if (visible) { content = cell.entity ? EMOJIS[cell.entity.type] : EMOJIS[cell.terrain]; op = "opacity-100"; }
+                    else if (cell.explored) { content = EMOJIS[cell.terrain]; op = "opacity-20 grayscale"; }
+                    return <div key={`${x}-${y}`} className={`w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 flex items-center justify-center text-lg transition-all duration-300 ${op}`}>{content}</div>;
+                  })}
                 </div>
               ))}
             </div>
-            <div className="w-48 space-y-4">
-              <div className="p-2 bg-slate-800 rounded border border-slate-700 text-sm">
-                <div className="text-red-400 font-bold">HP: {p.hp}/{p.max}</div>
-                <div className="w-full bg-slate-950 h-2 rounded mt-1 overflow-hidden">
-                  <div className="bg-red-600 h-full" style={{width: `${(p.hp/p.max)*100}%`}}></div>
+
+            {/* STATUS E MINI-MAPA */}
+            <div className="flex flex-col w-full lg:w-72 gap-4">
+              <div className="bg-slate-900 border-2 border-slate-800 p-4 rounded-lg shadow-lg">
+                <div className="flex justify-between text-xs mb-1 font-bold text-red-400">
+                  <span>HP {gameState.player.hp}/{gameState.player.maxHp}</span>
+                  <span>NVL {gameState.player.level}</span>
                 </div>
-                <div className="mt-2 text-orange-400">ATK: {p.atk}</div>
+                <div className="w-full bg-slate-800 h-3 rounded-full border border-slate-700 overflow-hidden mb-4">
+                  <div className="bg-red-600 h-full transition-all duration-500" style={{ width: `${(gameState.player.hp / gameState.player.maxHp) * 100}%` }}></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-center uppercase">
+                  <div className="bg-slate-800 p-2 rounded">Dano: <span className="text-orange-400">{gameState.player.damage}</span></div>
+                  <div className="bg-slate-800 p-2 rounded">XP: <span className="text-blue-400">{gameState.player.xp}</span></div>
+                </div>
               </div>
-              <div className="p-2 bg-slate-800 rounded border border-slate-700 h-40 overflow-hidden text-[10px]">
-                {log.map((m, i) => <div key={i} className={i===0?"text-white":"text-slate-500"}>{m}</div>)}
+
+              {/* MINI-MAPA */}
+              <div className="bg-slate-900 border-2 border-slate-800 p-2 rounded-lg shadow-lg">
+                <h2 className="text-[10px] text-slate-500 font-bold mb-2 uppercase">Mini-Mapa</h2>
+                <div className="bg-black p-1 rounded flex justify-center">
+                   <div className="grid" style={{ gridTemplateColumns: `repeat(${MAP_WIDTH}, 1fr)`, gap: '1px' }}>
+                    {gameState.map.map((row, y) => row.map((cell, x) => {
+                        let bg = "bg-transparent";
+                        if (cell.explored) {
+                          if (x === gameState.player.x && y === gameState.player.y) bg = "bg-emerald-400 shadow-[0_0_4px_#34d399]";
+                          else if (cell.terrain === 'stairs') bg = "bg-amber-400 animate-pulse";
+                          else if (cell.terrain === 'wall') bg = "bg-slate-800";
+                          else bg = "bg-slate-900";
+                        }
+                        return <div key={`${x}-${y}`} className={`w-[6px] h-[6px] ${bg} rounded-[1px]`}></div>;
+                    }))}
+                   </div>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 border-2 border-slate-800 p-3 rounded-lg flex-1 min-h-[100px] text-[10px] italic text-slate-400">
+                {gameState.log.map((m, i) => <div key={i} className={i === 0 ? "text-emerald-300 font-bold" : ""}>{i === 0 ? "» " : ""}{m}</div>)}
               </div>
             </div>
           </div>
+
+          {/* LEVEL UP MODAL */}
+          {gameState.player.statPoints > 0 && (
+            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+              <div className="bg-slate-900 border-2 border-amber-500 p-6 rounded-2xl text-center max-w-xs w-full shadow-2xl">
+                <h2 className="text-xl text-amber-500 mb-4 font-black uppercase">Level Up!</h2>
+                <button onClick={() => setGameState(p => ({...p, player: {...p.player, maxHp: p.player.maxHp+5, hp: p.player.hp+5, statPoints: p.player.statPoints-1}}))} className="w-full mb-3 bg-emerald-900/20 border border-emerald-500 text-emerald-400 py-3 rounded-lg hover:bg-emerald-500/10 font-bold">+5 HP Máximo</button>
+                <button onClick={() => setGameState(p => ({...p, player: {...p.player, damage: p.player.damage+1, statPoints: p.player.statPoints-1}}))} className="w-full bg-orange-900/20 border border-orange-500 text-orange-400 py-3 rounded-lg hover:bg-orange-500/10 font-bold">+1 Dano Atq</button>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
-    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<DruidGame />);
   </script>
 </body>
 </html>

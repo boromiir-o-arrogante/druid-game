@@ -3,19 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Survival</title>
+  <title>Lost in Blackwood - Hardcore</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { margin: 0; background-color: #020617; overflow-x: hidden; color: #e2e8f0; font-family: 'Courier New', Courier, monospace; }
-    html { overflow: hidden; touch-action: none; }
-    .glow-red { box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
-    .glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: #020617; }
-    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+    body { margin: 0; background-color: #020617; color: #e2e8f0; font-family: 'Courier New', monospace; overflow: hidden; }
+    .death-screen { animation: fadeIn 2s forwards; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .shake { animation: shake 0.2s; }
+    @keyframes shake { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-2px, -1px); } 100% { transform: translate(0, 0); } }
   </style>
 </head>
 <body>
@@ -26,276 +24,235 @@
     const EMOJIS = { 
       wall: "🌲", floor: "·", player: "👦", goblin: "👹", 
       slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", 
-      stairs: "🪜", fruit: "🍎" 
+      stairs: "🪜", fruit: "🍎", boss: "👿" 
     };
     
-    const ENEMY_BASE = [
-      { type: 'bat', hp: 2, xp: 1, name: 'Morcego' },
-      { type: 'slime', hp: 3, xp: 1, name: 'Slime' },
-      { type: 'goblin', hp: 5, xp: 2, name: 'Goblin' },
-      { type: 'orc', hp: 10, xp: 4, name: 'Orc' }
+    const ENEMY_TYPES = [
+      { type: 'bat', hp: 4, xp: 1, dmg: 1, name: 'Morcego' },
+      { type: 'slime', hp: 6, xp: 2, dmg: 2, name: 'Slime' },
+      { type: 'goblin', hp: 10, xp: 4, dmg: 3, name: 'Goblin' },
+      { type: 'orc', hp: 20, xp: 8, dmg: 5, name: 'Orc' }
     ];
 
-    const MAP_WIDTH = 24; const MAP_HEIGHT = 14; const VISION_RADIUS = 5;
+    const MAP_W = 24; const MAP_H = 14; const VISION = 5;
 
-    const isVisible = (cellX, cellY, player) => {
-      const dx = cellX - player.x; const dy = cellY - player.y;
-      const absDx = Math.abs(dx); const absDy = Math.abs(dy);
-      if (absDx <= 1 && absDy <= 1) return true; 
-      if (absDx > VISION_RADIUS || absDy > VISION_RADIUS) return false;
-      if (player.facing === 'UP' && dy < 0 && absDx <= Math.abs(dy)) return true;
-      if (player.facing === 'DOWN' && dy > 0 && absDx <= dy) return true;
-      if (player.facing === 'LEFT' && dx < 0 && absDy <= Math.abs(dx)) return true;
-      if (player.facing === 'RIGHT' && dx > 0 && absDy <= dx) return true;
-      return false;
+    const isVisible = (x, y, p) => {
+      const dx = Math.abs(x - p.x), dy = Math.abs(y - p.y);
+      return (dx <= 1 && dy <= 1) || (dx <= VISION && dy <= VISION && 
+        ((p.f === 'UP' && y < p.y && dx <= dy) || (p.f === 'DOWN' && y > p.y && dx <= Math.abs(dy)) ||
+         (p.f === 'LEFT' && x < p.x && dy <= dx) || (p.f === 'RIGHT' && x > p.x && dy <= Math.abs(dx))));
     };
 
-    const generateLevel = (floor, startX, startY) => {
-      const newMap = [];
-      const obstacleChance = 0.16;
-      const fruitChance = 0.04; // 4% de chance de fruta em cada piso vazio
-
-      for (let y = 0; y < MAP_HEIGHT; y++) {
-        const row = [];
-        for (let x = 0; x < MAP_WIDTH; x++) {
-          const isBorder = y === 0 || y === MAP_HEIGHT - 1 || x === 0 || x === MAP_WIDTH - 1;
-          const isSpawn = x === startX && y === startY;
-          let terrain = isBorder || (Math.random() < obstacleChance && !isSpawn) ? 'wall' : 'floor';
-          
-          // Gerar fruta
-          let entity = null;
-          if (terrain === 'floor' && !isSpawn && Math.random() < fruitChance) {
-            entity = { type: 'fruit' };
-          }
-
-          row.push({ x, y, terrain, entity, explored: false });
+    const generateMap = (floor) => {
+      let map = [];
+      for (let y = 0; y < MAP_H; y++) {
+        let row = [];
+        for (let x = 0; x < MAP_W; x++) {
+          const isWall = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1 || (Math.random() < 0.18 && x > 3);
+          row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
         }
-        newMap.push(row);
+        map.push(row);
       }
 
-      // Escada
-      let stairsPlaced = false;
-      while(!stairsPlaced) {
-        let sx = Math.floor(Math.random() * (MAP_WIDTH-2)) + 1;
-        let sy = Math.floor(Math.random() * (MAP_HEIGHT-2)) + 1;
-        if(newMap[sy][sx].terrain === 'floor' && Math.abs(sx - startX) > 12) {
-          newMap[sy][sx].terrain = 'stairs';
-          newMap[sy][sx].entity = null; // Limpa fruta se houver
-          stairsPlaced = true;
+      // Frutas raras (Dificuldade aumentada)
+      map.forEach(r => r.forEach(c => {
+        if (c.t === 'floor' && Math.random() < 0.015) c.e = { type: 'fruit' };
+      }));
+
+      // Boss do Andar (Chance de 70% de ter um boss)
+      if (Math.random() < 0.7) {
+        let bx = Math.floor(Math.random() * 10) + 10, by = Math.floor(Math.random() * 10) + 2;
+        map[by][bx].e = { type: 'boss', hp: 30 + (floor * 15), maxHp: 30 + (floor * 15), dmg: 5 + floor, xp: 20, name: 'Guardião' };
+      }
+
+      // Inimigos comuns
+      for (let i = 0; i < 6 + floor; i++) {
+        let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
+        if (map[ry][rx].t === 'floor' && !map[ry][rx].e) {
+          const base = ENEMY_TYPES[Math.floor(Math.random() * Math.min(floor, 4))];
+          map[ry][rx].e = { ...base, hp: base.hp + (floor * 2), dmg: base.dmg + Math.floor(floor/2) };
         }
       }
 
-      // Inimigos
-      let enemiesToSpawn = 5 + Math.floor(floor / 2);
-      while (enemiesToSpawn > 0) {
-        let rx = Math.floor(Math.random() * (MAP_WIDTH-2)) + 1;
-        let ry = Math.floor(Math.random() * (MAP_HEIGHT-2)) + 1;
-        if (newMap[ry][rx].terrain === 'floor' && !newMap[ry][rx].entity && !(rx === startX && ry === startY)) {
-          const base = ENEMY_BASE[Math.floor(Math.random() * Math.min(floor, ENEMY_BASE.length))];
-          newMap[ry][rx].entity = { ...base, hp: base.hp + floor, maxHp: base.hp + floor };
-          enemiesToSpawn--;
-        }
-      }
-      return newMap;
+      map[MAP_H-2][MAP_W-2].t = 'stairs';
+      return map;
     };
 
     function App() {
       const [floor, setFloor] = useState(1);
-      const [gameState, setGameState] = useState(() => {
-        const startX = 2; const startY = 2;
-        const initialMap = generateLevel(1, startX, startY);
-        const player = { x: startX, y: startY, hp: 20, maxHp: 20, damage: 3, facing: 'DOWN', level: 1, xp: 0, statPoints: 0 };
-        initialMap[startY][startX].entity = { type: 'player' };
-        initialMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, player)) c.explored = true; }));
-        return { map: initialMap, player, log: ["Você acordou no meio de Blackwood..."] };
-      });
+      const [p, setP] = useState({ x: 2, y: 2, hp: 25, max: 25, atk: 4, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
+      const [map, setMap] = useState(() => generateMap(1));
+      const [log, setLog] = useState(["Blackwood não perdoa os fracos..."]);
 
-      const nextFloor = useCallback(() => {
-        const newFloorNum = floor + 1;
-        setFloor(newFloorNum);
-        const startX = 2; const startY = 2;
-        const newMap = generateLevel(newFloorNum, startX, startY);
-        const updatedPlayer = { ...gameState.player, x: startX, y: startY };
-        newMap[startY][startX].entity = { type: 'player' };
-        newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, updatedPlayer)) c.explored = true; }));
-        setGameState(prev => ({ ...prev, map: newMap, player: updatedPlayer, log: [`Andar ${newFloorNum}: O ar parece mais pesado aqui.`, ...prev.log] }));
-      }, [floor, gameState.player]);
+      const updateAI = (currentMap, playerPos) => {
+        let newMap = currentMap.map(r => r.map(c => ({...c})));
+        let damageTaken = 0;
 
-      const movePlayer = useCallback((dx, dy) => {
-        setGameState((prev) => {
-          if (prev.player.hp <= 0 || prev.player.statPoints > 0) return prev;
-          let newFacing = prev.player.facing;
-          if (dx === 0 && dy === -1) newFacing = 'UP'; else if (dx === 0 && dy === 1) newFacing = 'DOWN';
-          else if (dx === -1 && dy === 0) newFacing = 'LEFT'; else if (dx === 1 && dy === 0) newFacing = 'RIGHT';
+        for (let y = 0; y < MAP_H; y++) {
+          for (let x = 0; x < MAP_W; x++) {
+            const cell = currentMap[y][x];
+            if (cell.e && cell.e.type !== 'player' && cell.e.type !== 'fruit') {
+              // Movimento simples em direção ao player
+              let dx = playerPos.x - x, dy = playerPos.y - y;
+              let nextX = x + (dx !== 0 ? dx / Math.abs(dx) : 0);
+              let nextY = y + (dy !== 0 ? dy / Math.abs(dy) : 0);
 
-          const newX = prev.player.x + dx; const newY = prev.player.y + dy;
-          if (newY < 0 || newY >= MAP_HEIGHT || newX < 0 || newX >= MAP_WIDTH) return prev;
-
-          const targetCell = prev.map[newY][newX];
-          if (targetCell.terrain === 'stairs') { setTimeout(nextFloor, 10); return prev; }
-
-          const newMap = prev.map.map(row => [...row]);
-          let newLog = [...prev.log];
-          let newPlayer = { ...prev.player, facing: newFacing };
-
-          // Mecânica de Fruta
-          if (targetCell.entity && targetCell.entity.type === 'fruit') {
-            newPlayer.hp = Math.min(newPlayer.hp + 5, newPlayer.maxHp);
-            newLog.unshift("🍎 Você comeu uma maçã e recuperou 5 HP!");
-            targetCell.entity = null;
-          }
-
-          if (targetCell.terrain === 'wall') {
-             newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
-             return { ...prev, map: newMap, player: newPlayer };
-          }
-
-          if (targetCell.entity && targetCell.entity.type !== 'player') {
-            const enemy = { ...targetCell.entity };
-            enemy.hp -= newPlayer.damage;
-            newLog.unshift(`Você atacou o ${enemy.name}!`);
-            if (enemy.hp > 0) {
-              const enemyDmg = Math.floor(floor * 0.7) + 1;
-              newPlayer.hp -= enemyDmg;
-              newLog.unshift(`O ${enemy.name} revidou: -${enemyDmg} HP!`);
-              newMap[newY][newX].entity = enemy;
-            } else {
-              newMap[newY][newX].entity = null;
-              newPlayer.xp += enemy.xp;
-              newLog.unshift(`Derrotou o ${enemy.name}! +${enemy.xp} XP`);
-              if (newPlayer.xp >= newPlayer.level * 5) { newPlayer.level++; newPlayer.statPoints++; }
+              if (nextX === playerPos.x && nextY === playerPos.y) {
+                damageTaken += cell.e.dmg || 1;
+              } else if (newMap[nextY][nextX].t === 'floor' && !newMap[nextY][nextX].e) {
+                newMap[nextY][nextX].e = {...cell.e};
+                newMap[y][x].e = null;
+              }
             }
-            if(newPlayer.hp <= 0) newLog.unshift("💀 FIM DE JOGO!");
-            newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
-            return { ...prev, map: newMap, player: newPlayer, log: newLog.slice(0, 6) };
           }
+        }
+        return { newMap, damageTaken };
+      };
 
-          newMap[prev.player.y][prev.player.x].entity = null;
-          newMap[newY][newX].entity = { type: 'player' };
-          newPlayer.x = newX; newPlayer.y = newY;
-          newMap.forEach(row => row.forEach(c => { if (isVisible(c.x, c.y, newPlayer)) c.explored = true; }));
-          return { ...prev, map: newMap, player: newPlayer, log: newLog };
-        });
-      }, [floor, nextFloor]);
+      const move = (dx, dy) => {
+        if (p.hp <= 0 || p.sp > 0) return;
+        let nx = p.x + dx, ny = p.y + dy;
+        let nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
+        
+        if (nx < 0 || nx >= MAP_W || ny < 0 || ny >= MAP_H) return;
+        const target = map[ny][nx];
+        if (target.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
+
+        let newLog = [];
+        let newP = { ...p, x: nx, y: ny, f: nf };
+
+        // Combate ou Interação
+        if (target.e) {
+          if (target.e.type === 'fruit') {
+            newP.hp = Math.min(newP.hp + 4, newP.max);
+            newLog.push("🍎 Fruta amarga... (+4 HP)");
+            target.e = null;
+          } else {
+            // Player ataca
+            target.e.hp -= p.atk;
+            newLog.push(`Você feriu o ${target.e.name}!`);
+            if (target.e.hp <= 0) {
+              newP.xp += target.e.xp || 2;
+              newLog.push(`Morte confirmada! +${target.e.xp} XP`);
+              target.e = null;
+              if (newP.xp >= newP.lvl * 10) { newP.lvl++; newP.sp++; }
+            }
+            newP.x = p.x; newP.y = p.y; // Fica parado ao atacar
+          }
+        }
+
+        // Turno dos Monstros (Eles perseguem e batem)
+        const aiResult = updateAI(map, {x: newP.x, y: newP.y});
+        newP.hp -= aiResult.damageTaken;
+        if (aiResult.damageTaken > 0) newLog.push(`⚠️ Emboscada! Você perdeu ${aiResult.damageTaken} HP`);
+
+        // Escada
+        if (target.t === 'stairs' && !target.e) {
+          const nextF = floor + 1;
+          setFloor(nextF);
+          setMap(generateMap(nextF));
+          setP({...newP, x: 2, y: 2});
+          setLog(["Você desceu mais fundo...", ...log]);
+          return;
+        }
+
+        if (newP.hp <= 0) newLog.push("💀 A floresta consumiu sua alma.");
+        
+        setLog(prev => [...newLog, ...prev].slice(0, 8));
+        setMap(aiResult.newMap);
+        setP(newP);
+      };
 
       useEffect(() => {
-        const handleKeyDown = (e) => {
-          const keys = { w:[0,-1], s:[0,1], a:[-1,0], d:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1], ArrowLeft:[-1,0], ArrowRight:[1,0] };
-          if (keys[e.key]) { e.preventDefault(); movePlayer(...keys[e.key]); }
+        const h = (e) => {
+          const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+          if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-      }, [movePlayer]);
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [p, map]);
 
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen w-full bg-slate-950 p-4 select-none">
-          <header className="mb-6 text-center">
-            <h1 className="text-emerald-400 text-3xl font-black tracking-tighter italic">LOST IN BLACKWOOD</h1>
-            <div className="text-[10px] text-slate-500 uppercase tracking-[0.5em] mt-1">Nível de Exploração: {floor}</div>
-          </header>
+        <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-950">
+          <div className="mb-4 text-center">
+            <h1 className="text-red-600 text-3xl font-black tracking-tighter shadow-red-900">LOST IN BLACKWOOD</h1>
+            <div className="text-xs text-slate-600 font-bold uppercase tracking-[0.4em]">Andar da Agonia: {floor}</div>
+          </div>
 
-          <div className="flex flex-col xl:flex-row gap-8 items-start max-w-7xl">
-            {/* MAPA PRINCIPAL */}
-            <div className="bg-black p-1 border-4 border-slate-900 rounded-2xl glow-emerald shadow-2xl overflow-hidden overflow-x-auto">
-              {gameState.map.map((row, y) => (
-                <div key={y} className="flex min-w-max">
-                  {row.map((cell, x) => {
-                    const visible = isVisible(x, y, gameState.player);
-                    let content = "⬛"; let op = "opacity-0";
-                    if (visible) { 
-                      content = cell.entity ? EMOJIS[cell.entity.type] : EMOJIS[cell.terrain]; 
-                      op = "opacity-100"; 
-                    } else if (cell.explored) { 
-                      content = EMOJIS[cell.terrain]; 
-                      op = "opacity-20 grayscale"; 
-                    }
-                    return <div key={`${x}-${y}`} className={`w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-xl transition-all duration-300 ${op}`}>{content}</div>;
+          <div className="flex flex-col xl:flex-row gap-6">
+            {/* MAPA */}
+            <div className="bg-black p-1 border-4 border-red-900/30 rounded-lg shadow-2xl overflow-hidden shadow-red-900/10">
+              {map.map((row, y) => (
+                <div key={y} className="flex">
+                  {row.map((c, x) => {
+                    const vis = isVisible(x, y, p);
+                    if (vis) c.v = true;
+                    let char = "⬛"; let op = "opacity-0";
+                    if (vis) { char = p.x===x && p.y===y ? EMOJIS.player : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
+                    else if (c.v) { char = EMOJIS[c.t]; op="opacity-10 grayscale"; }
+                    return <div key={x} className={`w-8 h-8 flex items-center justify-center text-xl ${op}`}>{char}</div>;
                   })}
                 </div>
               ))}
             </div>
 
-            {/* PAINEL LATERAL */}
-            <div className="w-full xl:w-80 flex flex-col gap-6">
-              {/* STATUS */}
-              <div className="bg-slate-900 border-b-4 border-emerald-900 p-5 rounded-2xl shadow-xl">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sobrevivente</span>
-                  <span className="text-emerald-400 text-sm font-black">NVL {gameState.player.level}</span>
+            {/* PAINEL */}
+            <div className="w-full xl:w-72 flex flex-col gap-4">
+              <div className="bg-slate-900 border-2 border-red-900 p-4 rounded-lg">
+                <div className="flex justify-between text-[10px] font-bold text-red-500 mb-1 italic">
+                  <span>SINAIS VITAIS</span>
+                  <span>NVL {p.lvl}</span>
                 </div>
-                <div className="mb-4">
-                  <div className="w-full bg-black/50 h-4 rounded-full border border-slate-800 p-0.5">
-                    <div className="bg-gradient-to-r from-red-800 to-red-500 h-full rounded-full transition-all duration-500" style={{ width: `${(gameState.player.hp / gameState.player.maxHp) * 100}%` }}></div>
-                  </div>
-                  <div className="flex justify-between text-[10px] mt-1 text-slate-500 font-bold">
-                    <span>HP: {gameState.player.hp} / {gameState.player.maxHp}</span>
-                    <span>XP: {gameState.player.xp}</span>
-                  </div>
+                <div className="w-full bg-black h-4 rounded-sm border border-red-900/50 overflow-hidden">
+                  <div className="bg-red-700 h-full transition-all" style={{width:`${(p.hp/p.max)*100}%`}}></div>
                 </div>
-                <div className="flex gap-2">
-                   <div className="bg-black/30 flex-1 p-2 rounded-lg border border-slate-800 text-center">
-                      <div className="text-[9px] text-slate-500">ATAQUE</div>
-                      <div className="text-orange-400 font-bold text-sm">⚔️ {gameState.player.damage}</div>
-                   </div>
-                   <div className="bg-black/30 flex-1 p-2 rounded-lg border border-slate-800 text-center">
-                      <div className="text-[9px] text-slate-500">DEFESA</div>
-                      <div className="text-blue-400 font-bold text-sm">🛡️ {floor}</div>
-                   </div>
+                <div className="flex justify-between text-[10px] mt-2 font-bold text-slate-400">
+                  <span>HP: {p.hp}/{p.max}</span>
+                  <span>XP: {p.xp}</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="bg-black p-2 border border-slate-800 text-[10px] text-center">ATQ: <span className="text-orange-600">{p.atk}</span></div>
+                  <div className="bg-black p-2 border border-slate-800 text-[10px] text-center">DIF: <span className="text-red-600">H HARD</span></div>
                 </div>
               </div>
 
-              {/* MINI-MAPA MELHORADO */}
-              <div className="bg-slate-900 p-3 rounded-2xl border border-slate-800 shadow-inner">
-                <div className="text-[9px] text-slate-500 mb-2 font-bold uppercase flex justify-between">
-                   <span>Radar de Blackwood</span>
-                   <span className="text-emerald-500 animate-pulse">● LIVE</span>
-                </div>
-                <div className="bg-black/80 rounded-lg p-2 flex justify-center border border-emerald-900/30">
-                   <div className="grid gap-[1px]" style={{ gridTemplateColumns: `repeat(${MAP_WIDTH}, 1fr)` }}>
-                    {gameState.map.map((row, y) => row.map((cell, x) => {
-                        let color = "bg-transparent";
-                        const visible = isVisible(x, y, gameState.player);
-                        if (cell.explored) {
-                          if (x === gameState.player.x && y === gameState.player.y) color = "bg-emerald-400 shadow-[0_0_5px_#34d399]";
-                          else if (cell.terrain === 'stairs') color = "bg-amber-400 animate-pulse";
-                          else if (cell.entity && cell.entity.type !== 'fruit' && visible) color = "bg-red-500 animate-pulse"; // MONSTRO VISTO
-                          else if (cell.entity && cell.entity.type === 'fruit' && visible) color = "bg-red-300"; // FRUTA VISTA
-                          else if (cell.terrain === 'wall') color = "bg-slate-800";
-                          else color = "bg-slate-900";
-                        }
-                        return <div key={`${x}-${y}`} className={`w-1.5 h-1.5 md:w-2 md:h-2 ${color} rounded-[1px]`}></div>;
-                    }))}
-                   </div>
+              {/* MINI MAPA PREMIUM */}
+              <div className="bg-slate-900 p-2 border border-slate-800 rounded-lg">
+                <div className="text-[8px] text-slate-500 mb-2 font-bold uppercase tracking-widest text-center">Monitor de Área</div>
+                <div className="bg-black p-1 rounded-sm grid" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
+                  {map.map((row, y) => row.map((c, x) => {
+                    let color = "bg-transparent";
+                    if (c.v) {
+                      if (p.x===x && p.y===y) color = "bg-emerald-500 shadow-[0_0_3px_#10b981]";
+                      else if (c.e && isVisible(x,y,p)) color = c.e.type==='boss' ? "bg-purple-600 animate-ping" : "bg-red-600";
+                      else if (c.t==='wall') color = "bg-slate-800";
+                      else color = "bg-slate-900";
+                    }
+                    return <div key={`${x}-${y}`} className={`w-1.5 h-1.5 ${color} rounded-[1px]`}></div>;
+                  }))}
                 </div>
               </div>
 
-              {/* LOG */}
-              <div className="bg-black/40 border-l-2 border-emerald-500 p-4 rounded-r-xl h-32 overflow-hidden overflow-y-auto">
-                {gameState.log.map((m, i) => (
-                  <div key={i} className={`text-[10px] mb-1.5 ${i === 0 ? "text-emerald-200" : "text-slate-600"}`}>
-                    {i === 0 ? "» " : ""}{m}
-                  </div>
-                ))}
+              <div className="bg-black/50 p-3 rounded border border-red-900/20 h-40 overflow-hidden text-[9px] italic">
+                {log.map((m, i) => <div key={i} className={i===0?"text-red-400 font-bold":"text-slate-600"}>{i===0?"» ":""}{m}</div>)}
               </div>
             </div>
           </div>
 
-          {/* LEVEL UP MODAL */}
-          {gameState.player.statPoints > 0 && (
-            <div className="fixed inset-0 bg-black/95 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-slate-900 border-2 border-amber-500 p-8 rounded-3xl text-center max-w-xs w-full glow-red">
-                <h2 className="text-2xl text-amber-500 font-black mb-1 uppercase italic italic tracking-tighter">Level Up!</h2>
-                <p className="text-slate-500 text-[10px] mb-6 tracking-widest">SINTA O CRESCIMENTO DA FLORESTA</p>
-                <div className="flex flex-col gap-4">
-                  <button onClick={() => setGameState(p => ({...p, player: {...p.player, maxHp: p.player.maxHp+10, hp: p.player.hp+10, statPoints: p.player.statPoints-1}}))} 
-                    className="bg-emerald-950/30 border border-emerald-500 text-emerald-400 py-4 rounded-xl hover:bg-emerald-500 hover:text-white transition-all font-bold">
-                    🌿 Vigor (+10 HP)
-                  </button>
-                  <button onClick={() => setGameState(p => ({...p, player: {...p.player, damage: p.player.damage+2, statPoints: p.player.statPoints-1}}))} 
-                    className="bg-orange-950/30 border border-orange-500 text-orange-400 py-4 rounded-xl hover:bg-orange-500 hover:text-white transition-all font-bold">
-                    ⚔️ Fúria (+2 Dano)
-                  </button>
-                </div>
+          {p.hp <= 0 && (
+            <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-[100] death-screen p-6">
+              <h2 className="text-6xl text-red-700 font-black mb-4">VOCÊ MORREU</h2>
+              <p className="text-slate-500 mb-8 italic text-center">Blackwood reclamou o que é dela. Você chegou ao Andar {floor}.</p>
+              <button onClick={()=>window.location.reload()} className="px-8 py-3 bg-red-900 text-white font-bold hover:bg-red-700 transition-colors rounded-full uppercase tracking-widest">Tentar Novamente</button>
+            </div>
+          )}
+
+          {p.sp > 0 && (
+            <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
+              <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-lg text-center max-w-xs w-full shadow-[0_0_50px_rgba(220,38,38,0.3)]">
+                <h2 className="text-2xl text-red-500 font-black mb-6 uppercase tracking-tighter">Sobrevivência</h2>
+                <button onClick={()=>setP(prev=>({...prev, max:prev.max+8, hp:prev.hp+8, sp:prev.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded hover:bg-red-600 hover:text-white font-bold transition-all uppercase text-xs">Vigor (+8 HP)</button>
+                <button onClick={()=>setP(prev=>({...prev, atk:prev.atk+2, sp:prev.sp-1}))} className="w-full bg-slate-800 border border-slate-600 text-slate-300 py-4 rounded hover:bg-slate-200 hover:text-black font-bold transition-all uppercase text-xs">Ataque (+2 Atk)</button>
               </div>
             </div>
           )}

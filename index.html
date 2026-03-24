@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Build System</title>
+  <title>Lost in Blackwood - Fixed Movement</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -16,7 +16,7 @@
     .lvl-3 { border-color: #3b82f6; color: #bfdbfe; box-shadow: 0 0 8px #3b82f6; }
     .lvl-4 { border-color: #a855f7; color: #e9d5ff; box-shadow: 0 0 12px #a855f7; }
     .lvl-5 { border-color: #f97316; color: #fed7aa; box-shadow: 0 0 20px #f97316; }
-    @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.3); background-color: #d8b4fe; } }
+    @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.2); background-color: #d8b4fe; } }
     .animate-boss-radar { animation: pulse-purple 0.8s infinite; }
   </style>
 </head>
@@ -73,7 +73,7 @@
       const [floor, setFloor] = useState(1);
       const [p, setP] = useState({ x: 2, y: 2, hp: 30, max: 30, atk: 5, range: 1, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
       const [map, setMap] = useState(() => generateMap(1));
-      const [log, setLog] = useState(["Blackwood: Escolha sua estratégia com sabedoria."]);
+      const [log, setLog] = useState(["Blackwood: Use WASD para explorar."]);
       const [inventory, setInventory] = useState([]); 
       const [pendingPowerUp, setPendingPowerUp] = useState(null); 
       const [offeredPowerUps, setOfferedPowerUps] = useState([]); 
@@ -91,27 +91,18 @@
 
       const handlePowerUpSelection = (puId) => {
         const existing = inventory.find(i => i.id === puId);
-        if (existing || inventory.length < 3) {
-          applyPowerUp(puId);
-        } else {
-          setPendingPowerUp(puId);
-        }
+        if (existing || inventory.length < 3) applyPowerUp(puId);
+        else setPendingPowerUp(puId);
       };
 
       const applyPowerUp = (puId) => {
         setInventory(prev => {
           const item = prev.find(i => i.id === puId);
-          if (item) {
-            if (item.lvl >= 5) return prev; // Max level 5
-            return prev.map(i => i.id === puId ? { ...i, lvl: i.lvl + 1 } : i);
-          }
+          if (item) return prev.map(i => i.id === puId ? { ...i, lvl: Math.min(5, i.lvl + 1) } : i);
           return [...prev, { id: puId, lvl: 1 }];
         });
-        
-        // Efeito imediato se for HP ou Atk
         if (puId === 'atk_dmg') setP(prev => ({ ...prev, atk: prev.atk + 2 }));
         if (puId === 'atk_rng') setP(prev => ({ ...prev, range: prev.range + 1 }));
-        
         setOfferedPowerUps([]);
         setPendingPowerUp(null);
       };
@@ -119,16 +110,10 @@
       const nextFloor = useCallback(() => {
         const nextF = floor + 1;
         setFloor(nextF);
-        
-        // Aplica Regeneração de Vida (5% do max por nível do PowerUp)
         const regItem = inventory.find(i => i.id === 'hp_reg');
         if (regItem) {
-          setP(prev => {
-            const heal = Math.floor(prev.max * (0.05 * regItem.lvl));
-            return { ...prev, hp: Math.min(prev.max, prev.hp + heal) };
-          });
+          setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + Math.floor(prev.max * (0.05 * regItem.lvl))) }));
         }
-
         setMap(generateMap(nextF));
         setP(prev => ({ ...prev, x: 2, y: 2 }));
         const shuffled = [...POWER_UPS_CATALOG].sort(() => 0.5 - Math.random());
@@ -137,10 +122,9 @@
 
       const move = (dx, dy) => {
         if (p.hp <= 0 || p.sp > 0 || offeredPowerUps.length > 0 || pendingPowerUp) return;
-        let nx = p.x + dx, ny = p.y + dy;
-        let nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
+        const nx = p.x + dx, ny = p.y + dy;
+        const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
         
-        // Alcance de Ataque
         let targetEnemy = null;
         for (let r = 1; r <= p.range; r++) {
           let tx = p.x + (dx * r), ty = p.y + (dy * r);
@@ -152,20 +136,17 @@
         }
 
         if (targetEnemy) {
-          let newLog = [];
+          let newLog = [`Acertou ${targetEnemy.data.name}!`];
           targetEnemy.data.hp -= p.atk;
-          newLog.push(`Acertou ${targetEnemy.data.name}!`);
-          
-          // Lógica de Drenar Vida (Lifesteal)
           const leach = inventory.find(i => i.id === 'atk_lch');
-          if (leach) setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + leach.lvl) }));
+          if (leach) setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + leach.lvl), f: nf }));
+          else setP(prev => ({ ...prev, f: nf }));
 
           if (targetEnemy.data.hp <= 0) {
             map[targetEnemy.y][targetEnemy.x].e = null;
             setP(prev => {
               let nextXp = prev.xp + targetEnemy.data.xp;
-              let nextLvl = prev.lvl;
-              let nextSp = prev.sp;
+              let nextLvl = prev.lvl, nextSp = prev.sp;
               if (nextXp >= prev.lvl * 15) { nextXp = 0; nextLvl++; nextSp++; }
               return { ...prev, xp: nextXp, lvl: nextLvl, sp: nextSp };
             });
@@ -178,40 +159,38 @@
         if (!target || target.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
         if (target.t === 'stairs') { nextFloor(); return; }
 
-        let newLog = [];
+        let currentLog = [];
         if (target.e?.type === 'fruit') {
-          setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + 8), x: nx, y: ny, f: nf }));
           target.e = null;
-          newLog.push("🍎 Maçã colhida! (+8 HP)");
+          currentLog.push("🍎 Maçã! (+8 HP)");
+          setP(prev => ({ ...prev, x: nx, y: ny, f: nf, hp: Math.min(prev.max, prev.hp + 8) }));
         } else {
           setP(prev => ({ ...prev, x: nx, y: ny, f: nf }));
         }
-
-        processEnemyTurn(newLog, nx, ny);
+        processEnemyTurn(currentLog, nx, ny);
       };
 
-      const processEnemyTurn = (currentLog, px = p.x, py = p.y) => {
+      const processEnemyTurn = (currentLog, px, py) => {
+        const playerX = px !== undefined ? px : p.x;
+        const playerY = py !== undefined ? py : p.y;
         let damageToPlayer = 0;
-        let reflectedDamage = 0;
         const resItem = inventory.find(i => i.id === 'def_res');
         const rflItem = inventory.find(i => i.id === 'def_rfl');
 
         const newMap = map.map(row => row.map(cell => {
           if (cell.e && !['player', 'fruit'].includes(cell.e.type)) {
-            let dx = px - cell.x, dy = py - cell.y;
+            let dx = playerX - cell.x, dy = playerY - cell.y;
             if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
               let dmg = Math.max(1, cell.e.dmg - (resItem ? resItem.lvl : 0));
               damageToPlayer += dmg;
-              if (rflItem) reflectedDamage = Math.floor(dmg * (0.2 * rflItem.lvl));
-              
-              if (reflectedDamage > 0) {
-                cell.e.hp -= reflectedDamage;
-                if (cell.e.hp <= 0) return { ...cell, e: null };
+              if (rflItem) {
+                 cell.e.hp -= Math.floor(dmg * (0.2 * rflItem.lvl));
+                 if (cell.e.hp <= 0) return { ...cell, e: null };
               }
             } else if (Math.random() > 0.4) {
               let sx = cell.x + (dx !== 0 ? dx / Math.abs(dx) : 0);
               let sy = cell.y + (dy !== 0 ? dy / Math.abs(dy) : 0);
-              if (map[sy][sx].t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) {
+              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === playerX && sy === playerY)) {
                 return { ...cell, e: null, pending: { ...cell.e, nx: sx, ny: sy } };
               }
             }
@@ -219,35 +198,40 @@
           return { ...cell };
         }));
 
-        // Resolve movimento
         newMap.forEach(r => r.forEach(c => {
           if (c.pending) { newMap[c.pending.ny][c.pending.nx].e = { ...c.pending }; delete c.pending; }
         }));
 
-        if (damageToPlayer > 0) currentLog.push(`💥 Dano recebido: -${damageToPlayer}`);
+        if (damageToPlayer > 0) currentLog.push(`💥 Dano: -${damageToPlayer}`);
         setP(prev => ({ ...prev, hp: prev.hp - damageToPlayer }));
         setMap(newMap);
         setLog(prev => [...currentLog, ...prev].slice(0, 6));
       };
+
+      useEffect(() => {
+        const h = (e) => {
+          const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+          if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
+        };
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [p, map, inventory, offeredPowerUps, pendingPowerUp]);
 
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-4 font-mono">
           <header className="mb-4 text-center">
             <h1 className="text-red-600 text-3xl font-black italic tracking-tighter uppercase">Lost in Blackwood</h1>
             <div className="flex justify-center gap-2 mt-2">
-              {inventory.map(i => {
-                const data = POWER_UPS_CATALOG.find(d => d.id === i.id);
-                return (
-                  <div key={i.id} className={`lvl-${i.lvl} border-2 px-2 py-1 rounded text-[10px] font-bold bg-slate-900`}>
-                    {data.icon} Lvl {i.lvl}
-                  </div>
-                );
-              })}
+              {inventory.map(i => (
+                <div key={i.id} className={`lvl-${i.lvl} border-2 px-2 py-1 rounded text-[9px] font-bold bg-slate-900`}>
+                  {POWER_UPS_CATALOG.find(d => d.id === i.id).icon} L{i.lvl}
+                </div>
+              ))}
             </div>
           </header>
 
           <div className="flex flex-col xl:flex-row gap-6">
-            <div className="border-4 border-slate-900 bg-black p-1 rounded-2xl">
+            <div className="border-4 border-slate-900 bg-black p-1 rounded-2xl shadow-2xl">
               {map.map((row, y) => (
                 <div key={y} className="flex">
                   {row.map((c, x) => {
@@ -256,28 +240,28 @@
                     let char = "⬛"; let op = "opacity-0";
                     if (vis) { char = p.x===x && p.y===y ? EMOJIS.player : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
                     else if (c.v) { char = EMOJIS[c.t]; op="opacity-10 grayscale"; }
-                    return <div key={x} className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-300 ${op}`}>{char}</div>;
+                    return <div key={x} className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-200 ${op}`}>{char}</div>;
                   })}
                 </div>
               ))}
             </div>
 
             <div className="w-full xl:w-72 flex flex-col gap-4">
-              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-red-500 font-bold text-sm italic">ANDAR {floor}</span>
-                  <span className="text-white font-black text-lg">LV {p.lvl}</span>
+              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
+                <div className="flex justify-between items-center mb-2 text-xs font-bold">
+                  <span className="text-red-500 italic">ANDAR {floor}</span>
+                  <span className="text-white">LV {p.lvl}</span>
                 </div>
                 <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-2">
-                  <div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div>
+                  <div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase text-slate-400">
                   <div className="bg-black/40 p-1 border border-slate-800 text-center">ATK: {p.atk}</div>
-                  <div className="bg-black/40 p-1 border border-slate-800 text-center">XP: {p.xp}</div>
+                  <div className="bg-black/40 p-1 border border-slate-800 text-center">RNG: {p.range}</div>
                 </div>
               </div>
 
-              <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 flex justify-center">
+              <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 flex justify-center shadow-inner">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
                   {map.map((row, y) => row.map((c, x) => {
                     let color = "bg-transparent";
@@ -288,33 +272,30 @@
                       else if (c.t==='wall') color = "bg-slate-800";
                       else color = "bg-slate-900";
                     }
-                    return <div key={`${x}-${y}`} className={`w-1.5 h-1.5 ${color} rounded-[1px]`}></div>;
+                    return <div key={`${x}-${y}`} className={`minimap-pixel ${color}`}></div>;
                   }))}
                 </div>
               </div>
 
-              <div className="bg-black/60 p-3 rounded-xl border border-slate-800 h-32 overflow-hidden text-[10px] italic">
+              <div className="bg-black/60 p-3 rounded-xl border border-slate-800 h-28 overflow-hidden text-[10px] italic">
                 {log.map((m, i) => <div key={i} className={i===0?"text-red-400 font-bold":"text-slate-500"}>{m}</div>)}
               </div>
             </div>
           </div>
 
-          {/* POWER UP SELECTION */}
           {offeredPowerUps.length > 0 && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
               <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-2xl w-full">
-                <h2 className="text-xl text-emerald-500 font-black mb-1 uppercase italic tracking-widest">Dádiva da Floresta</h2>
-                <p className="text-slate-500 text-[9px] mb-6 uppercase">O poder flui através de você</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <h2 className="text-xl text-emerald-500 font-black mb-1 uppercase italic tracking-widest text-center">Dádiva da Floresta</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   {offeredPowerUps.map(pu => {
-                    const invItem = inventory.find(i => i.id === pu.id);
-                    const currentLvl = invItem ? invItem.lvl : 0;
+                    const inv = inventory.find(i => i.id === pu.id);
                     return (
-                      <button key={pu.id} onClick={() => handlePowerUpSelection(pu.id)} className={`bg-slate-950 border-2 p-4 rounded-2xl transition-all group hover:scale-105 lvl-${currentLvl + 1}`}>
+                      <button key={pu.id} onClick={() => handlePowerUpSelection(pu.id)} className={`bg-slate-950 border-2 p-4 rounded-2xl transition-all hover:scale-105 lvl-${(inv?.lvl||0)+1}`}>
                         <div className="text-3xl mb-1">{pu.icon}</div>
                         <div className="font-bold text-xs uppercase">{pu.name}</div>
                         <div className="text-[8px] text-slate-500 mt-2">{pu.desc}</div>
-                        <div className="text-[8px] font-black mt-2">NÍVEL {currentLvl + 1}</div>
+                        <div className="text-[8px] font-black mt-2 uppercase">Nível {(inv?.lvl||0)+1}</div>
                       </button>
                     );
                   })}
@@ -323,35 +304,27 @@
             </div>
           )}
 
-          {/* REPLACE POWER UP */}
           {pendingPowerUp && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[60] p-4">
               <div className="bg-slate-900 border-2 border-red-500 p-8 rounded-3xl text-center max-w-sm w-full">
-                <h2 className="text-xl text-red-500 font-black mb-4 uppercase">Sacrifício Necessário</h2>
-                <p className="text-slate-400 text-[10px] mb-6">Mantenha apenas 3 caminhos de poder. O que você abandonará?</p>
+                <h2 className="text-xl text-red-500 font-black mb-4 uppercase italic">Limiar de Poder</h2>
                 <div className="flex flex-col gap-3">
-                  {inventory.map(item => {
-                    const data = POWER_UPS_CATALOG.find(d => d.id === item.id);
-                    return (
-                      <button key={item.id} onClick={() => {
-                        setInventory(prev => prev.filter(i => i.id !== item.id));
-                        applyPowerUp(pendingPowerUp);
-                      }} className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex items-center justify-between hover:bg-red-950 transition-colors">
-                        <span className="text-2xl">{data.icon}</span>
-                        <div className="text-[10px] font-bold uppercase text-slate-200">Abandonar {data.name}</div>
-                      </button>
-                    );
-                  })}
+                  {inventory.map(item => (
+                    <button key={item.id} onClick={() => { setInventory(prev => prev.filter(i => i.id !== item.id)); applyPowerUp(pendingPowerUp); }} 
+                      className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex items-center justify-between hover:bg-red-950 transition-colors">
+                      <span className="text-2xl">{POWER_UPS_CATALOG.find(d=>d.id===item.id).icon}</span>
+                      <span className="text-[10px] font-bold uppercase text-slate-200 ml-4">Descartar {POWER_UPS_CATALOG.find(d=>d.id===item.id).name}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* LEVEL UP STATS */}
           {p.sp > 0 && offeredPowerUps.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
               <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-2xl text-center max-w-xs w-full">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Instinto de Sobrevivência</h2>
+                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2>
                 <button onClick={()=>setP(prev=>({...prev, max:prev.max+10, hp:prev.hp+10, sp:prev.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-xl hover:bg-red-600 font-bold uppercase text-xs">Aumentar HP (+10)</button>
                 <button onClick={()=>setP(prev=>({...prev, atk:prev.atk+3, sp:prev.sp-1}))} className="w-full bg-slate-800 border border-slate-600 text-slate-300 py-4 rounded-xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aumentar Dano (+3)</button>
               </div>
@@ -360,8 +333,8 @@
 
           {p.hp <= 0 && (
             <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6">
-              <h2 className="text-7xl text-red-800 font-black mb-2 uppercase italic tracking-tighter">Morte</h2>
-              <button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full uppercase tracking-widest border-2 border-red-600">Tentar Novamente</button>
+              <h2 className="text-7xl text-red-800 font-black mb-2 uppercase italic">A Floresta Venceu</h2>
+              <button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full uppercase tracking-widest border-2 border-red-600">Reiniciar</button>
             </div>
           )}
         </div>

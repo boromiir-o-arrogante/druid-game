@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Impact Update</title>
+  <title>Lost in Blackwood - Milestone Update</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -12,27 +12,14 @@
     body { margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
     .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.5s ease; }
     .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.5s ease; }
-    
     .shake { animation: shakeAnim 0.2s cubic-bezier(.36,.07,.19,.97) both; }
-    @keyframes shakeAnim {
-      10%, 90% { transform: translate3d(-1px, 0, 0); }
-      20%, 80% { transform: translate3d(2px, 0, 0); }
-      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-      40%, 60% { transform: translate3d(4px, 0, 0); }
-    }
-
+    @keyframes shakeAnim { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
     .flash-lvl { animation: flashAnim 0.5s ease-out; }
-    @keyframes flashAnim {
-      0% { background-color: rgba(59, 130, 246, 0.5); }
-      100% { background-color: transparent; }
-    }
-
+    @keyframes flashAnim { 0% { background-color: rgba(59, 130, 246, 0.5); } 100% { background-color: transparent; } }
     .minimap-bg { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 6px; box-shadow: inset 0 0 10px #000; }
     @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.3); background-color: #e879f9; } }
     .animate-boss-radar { animation: pulse-purple 0.8s infinite; border-radius: 50%; }
-    .lvl-border { border-width: 2px; border-style: solid; }
-    .lvl-1 { border-color: #64748b; } .lvl-2 { border-color: #22c55e; } .lvl-3 { border-color: #3b82f6; } 
-    .lvl-4 { border-color: #a855f7; } .lvl-5 { border-color: #f97316; }
+    .milestone-unlocked { border-color: #fbbf24; color: #fbbf24; box-shadow: 0 0 10px rgba(251, 191, 36, 0.3); }
   </style>
 </head>
 <body class="select-none text-slate-200">
@@ -41,13 +28,11 @@
     const { useState, useEffect, useCallback } = React;
 
     const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", stairs: "🪜", fruit: "🍎", boss: "👿", blood: "🩸" };
-    
     const CLASSES = [
       { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 45, max: 45, atk: 5, range: 2, vis: 8, def: 0 } },
       { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 70, max: 70, atk: 6, range: 1, vis: 5, def: 2 } },
       { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 35, max: 35, atk: 11, range: 1, vis: 6, def: 0 } }
     ];
-
     const POWER_CATALOG = [
       { id: 'atk_dmg', name: 'Força', icon: '⚔️', desc: '+2 Dano' },
       { id: 'atk_rng', name: 'Alcance', icon: '🏹', desc: '+1 Alcance' },
@@ -58,11 +43,7 @@
     ];
 
     const MAP_W = 24; const MAP_H = 14; 
-    const ENEMY_BASE = [
-      { type: 'bat', hp: 12, xp: 10, dmg: 4, name: 'Morcego' }, 
-      { type: 'slime', hp: 18, xp: 12, dmg: 5, name: 'Slime' }, 
-      { type: 'goblin', hp: 30, xp: 20, dmg: 8, name: 'Goblin' }
-    ];
+    const ENEMY_BASE = [{ type: 'bat', hp: 12, xp: 10, dmg: 4, name: 'Morcego' }, { type: 'slime', hp: 18, xp: 12, dmg: 5, name: 'Slime' }, { type: 'goblin', hp: 30, xp: 20, dmg: 8, name: 'Goblin' }];
 
     const generateLevel = (floor) => {
       let map = [];
@@ -79,7 +60,7 @@
         map.push(row);
       }
       map[sPos.y][sPos.x].t = 'stairs';
-      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.05 && c.x > 3 && c.t !== 'stairs') c.e = { type: 'fruit' }; }));
+      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04 && c.x > 3 && c.t !== 'stairs') c.e = { type: 'fruit' }; }));
       for (let i = 0; i < 6 + (floor * 2); i++) {
         let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
         if (map[ry][rx].t === 'floor' && !map[ry][rx].e && (Math.abs(rx - pStart.x) > 4)) {
@@ -87,11 +68,6 @@
           const hp = base.hp + (floor * 5);
           map[ry][rx].e = { ...base, hp: hp, maxHp: hp, dmg: base.dmg + Math.floor(floor * 1.5) };
         }
-      }
-      if (Math.random() < 0.3) {
-        let bx = 12, by = 6;
-        const bHp = 100 + (floor * 30);
-        map[by][bx].e = { type: 'boss', hp: bHp, maxHp: bHp, dmg: 10 + floor, xp: 150, name: 'GUARDIÃO' };
       }
       return map;
     };
@@ -107,24 +83,18 @@
       const [isDead, setIsDead] = useState(false);
       const [combo, setCombo] = useState(0);
       const [turnCounter, setTurnCounter] = useState(0);
-      const [legacyData, setLegacyData] = useState({ hp: null, atk: null, powers: [] });
       const [shake, setShake] = useState(false);
       const [flash, setFlash] = useState(false);
+      
+      // META PROGRESSION
+      const [stats, setStats] = useState(() => {
+        const s = localStorage.getItem('bw_milestones');
+        return s ? JSON.parse(s) : { totalKills: 0, maxFloor: 0, maxLevel: 0 };
+      });
 
-      useEffect(() => {
-        const savedP = localStorage.getItem('eternal_player');
-        const savedPowers = localStorage.getItem('eternal_powers');
-        if (savedP) {
-          const parsed = JSON.parse(savedP);
-          setLegacyData({ hp: parsed.max, atk: parsed.atk, powers: savedPowers ? JSON.parse(savedPowers) : [] });
-        }
-      }, []);
-
-      const saveProgress = (player, powers, cClass) => {
-        if (!player) return;
-        localStorage.setItem('eternal_player', JSON.stringify({...player, hp: player.max}));
-        localStorage.setItem('eternal_powers', JSON.stringify(powers));
-        localStorage.setItem('eternal_class', JSON.stringify(cClass));
+      const saveMilestones = (newStats) => {
+        localStorage.setItem('bw_milestones', JSON.stringify(newStats));
+        setStats(newStats);
       };
 
       const start = (selectedClass) => {
@@ -132,42 +102,21 @@
         const savedPowers = localStorage.getItem('eternal_powers');
         let initialP;
         let initialPowers = [];
+
         if (savedP && savedPowers) {
           const parsed = JSON.parse(savedP);
           initialP = { ...parsed, hp: parsed.max, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' };
           initialPowers = JSON.parse(savedPowers);
         } else {
           initialP = { ...selectedClass.stats, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' };
+          // APLICAR MILESTONES INICIAIS
+          if (stats.totalKills >= 50) initialP.atk += 2;
+          if (stats.maxFloor >= 15) initialP.vis += 1;
+          if (stats.maxLevel >= 10) { initialP.max += 20; initialP.hp += 20; }
         }
+
         setCharClass(selectedClass); setP(initialP); setActivePowers(initialPowers);
-        setMap(generateLevel(1)); setFloor(1); setIsDead(false); setInventory([]); setCombo(0); setTurnCounter(0);
-        saveProgress(initialP, initialPowers, selectedClass);
-      };
-
-      const selectPower = (pu) => {
-        const newPowers = [...activePowers];
-        const exists = newPowers.find(i => i.id === pu.id);
-        if (exists) exists.lvl = Math.min(5, exists.lvl + 1);
-        else newPowers.push({ id: pu.id, lvl: 1 });
-        setActivePowers(newPowers);
-        let updatedP = { ...p };
-        if (pu.id === 'atk_dmg') updatedP.atk += 2;
-        if (pu.id === 'atk_rng') updatedP.range += 1;
-        setP(updatedP); setOffered([]);
-        saveProgress(updatedP, newPowers, charClass);
-      };
-
-      const isVisible = (x, y, player) => {
-        if (!player) return false;
-        const dx = x - player.x, dy = y - player.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 1.6) return true;
-        if (dist > player.vis) return false;
-        const angle = Math.atan2(dy, dx);
-        let targetAngle = player.f === 'UP' ? -Math.PI/2 : player.f === 'DOWN' ? Math.PI/2 : player.f === 'LEFT' ? Math.PI : 0;
-        let diff = Math.abs(angle - targetAngle);
-        if (diff > Math.PI) diff = 2*Math.PI - diff;
-        return diff < 0.8;
+        setMap(generateLevel(1)); setFloor(1); setIsDead(false); setInventory([]); setCombo(0);
       };
 
       const move = (dx, dy) => {
@@ -185,38 +134,30 @@
         }
 
         if (targetEnemy) {
-          let isCrit = combo >= 3;
-          let finalDmg = isCrit ? p.atk * 2 : p.atk;
-          targetEnemy.e.hp -= finalDmg;
-          const leach = activePowers.find(i => i.id === 'atk_lch');
-          if (leach) setP(v => ({...v, hp: Math.min(v.max, v.hp + leach.lvl), f: nf}));
-          else setP(v => ({...v, f: nf}));
-          
+          targetEnemy.e.hp -= (combo >= 3 ? p.atk * 2 : p.atk);
           if (targetEnemy.e.hp <= 0) {
             map[targetEnemy.y][targetEnemy.x].b = true; 
-            if (targetEnemy.e.type === 'boss') { setShake(true); setTimeout(()=>setShake(false), 200); }
+            saveMilestones({ ...stats, totalKills: stats.totalKills + 1 });
             let nXp = p.xp + targetEnemy.e.xp;
             if (nXp >= p.lvl * 40) { 
               nXp -= (p.lvl * 40); 
-              setP(v => ({...v, xp: nXp, lvl: v.lvl + 1, sp: v.sp + 1, f: nf}));
+              const newLvl = p.lvl + 1;
+              if (newLvl > stats.maxLevel) saveMilestones({ ...stats, maxLevel: newLvl });
+              setP(v => ({...v, xp: nXp, lvl: newLvl, sp: v.sp + 1, f: nf}));
               setFlash(true); setTimeout(()=>setFlash(false), 500);
-            }
-            else { setP(v => ({...v, xp: nXp, f: nf})); }
+            } else { setP(v => ({...v, xp: nXp, f: nf})); }
             setCombo(c => c + 1);
             map[targetEnemy.y][targetEnemy.x].e = null;
-          }
+          } else { setP(v => ({...v, f: nf})); }
           processAI(p.x, p.y); return;
         }
 
         const cell = map[ny]?.[nx];
         if (!cell || cell.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
         if (cell.t === 'stairs') {
-          const nextF = floor + 1; setFloor(nextF);
-          const regen = activePowers.find(i => i.id === 'hp_reg');
-          let healedHp = p.hp;
-          if (regen) healedHp = Math.min(p.max, p.hp + Math.floor(p.max * (0.05 * regen.lvl)));
-          setMap(generateLevel(nextF));
-          setP(v => ({...v, x: 2, y: 2, f: 'DOWN', hp: healedHp}));
+          const nF = floor + 1;
+          if (nF > stats.maxFloor) saveMilestones({ ...stats, maxFloor: nF });
+          setFloor(nF); setMap(generateLevel(nF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN'}));
           setOffered([...POWER_CATALOG].sort(() => 0.5 - Math.random()).slice(0, 3));
           return;
         }
@@ -232,18 +173,12 @@
       const processAI = (px, py) => {
         let dmgTaken = 0;
         setTurnCounter(t => t + 1);
-        const resPower = activePowers.find(i => i.id === 'def_res')?.lvl || 0;
-        const rflPower = activePowers.find(i => i.id === 'def_rfl')?.lvl || 0;
-
         const newMap = map.map(row => row.map(c => {
           if (c.e && !['fruit', 'player'].includes(c.e.type)) {
             const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
             if (dx <= 1 && dy <= 1) {
-              let hit = Math.max(1, c.e.dmg - (p.def + resPower));
-              dmgTaken += hit;
-              if (rflPower > 0) { c.e.hp -= Math.floor(hit * (0.2 * rflPower)); if (c.e.hp <= 0) return { ...c, e: null, b: true }; }
+              dmgTaken += Math.max(1, c.e.dmg - p.def);
             } else if (Math.random() > 0.4) {
-              if (c.e.type === 'boss' && turnCounter % 2 !== 0) return c;
               const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
               if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) 
                 return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
@@ -251,12 +186,11 @@
           }
           return c;
         }));
-        if (dmgTaken > 0) { setCombo(0); if(dmgTaken > 5) { setShake(true); setTimeout(()=>setShake(false), 200); } }
+        if (dmgTaken > 0) setCombo(0);
         newMap.forEach(r => r.forEach(c => { if(c.next) { newMap[c.next.ny][c.next.nx].e = c.next; delete c.next; } }));
         setMap(newMap); 
-        const finalHp = p.hp - dmgTaken;
-        if (finalHp <= 0) { setIsDead(true); saveProgress(p, activePowers, charClass); }
-        setP(v => ({ ...v, hp: finalHp }));
+        if (p.hp - dmgTaken <= 0) setIsDead(true);
+        setP(v => ({ ...v, hp: v.hp - dmgTaken }));
       };
 
       useEffect(() => {
@@ -269,36 +203,40 @@
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
-      }, [p, map, inventory, offered, activePowers, isDead, combo, turnCounter]);
+      }, [p, map, inventory, offered, isDead, combo]);
 
       if (!charClass) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 text-center">
-          <h1 className="text-5xl font-black text-red-600 mb-2 italic tracking-tighter uppercase font-mono">Lost in Blackwood</h1>
-          <div className="mb-8 p-4 bg-slate-900/50 border border-slate-800 rounded-2xl max-w-md w-full">
-            <h2 className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-3">Herança Salva</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-left bg-black/40 p-3 rounded-xl border border-red-900/30">
-                 <p className="text-[9px] text-red-500 font-bold uppercase">Atributos</p>
-                 <p className="text-sm font-black">❤️ {legacyData.hp || '--'} HP</p>
-                 <p className="text-sm font-black">⚔️ {legacyData.atk || '--'} ATK</p>
-              </div>
-              <div className="text-left bg-black/40 p-3 rounded-xl border border-blue-900/30">
-                 <p className="text-[9px] text-blue-500 font-bold uppercase">Poderes</p>
-                 <div className="flex flex-wrap gap-1 mt-1">
-                   {legacyData.powers.length > 0 ? legacyData.powers.map(pow => <span key={pow.id}>{POWER_CATALOG.find(x=>x.id===pow.id).icon}</span>) : <span className="text-[10px] text-slate-600">Nenhum</span>}
-                 </div>
-              </div>
+          <h1 className="text-5xl font-black text-red-600 mb-6 italic tracking-tighter uppercase font-mono">Lost in Blackwood</h1>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 w-full max-w-4xl">
+            <div className={`p-4 bg-slate-900 border-2 border-slate-800 rounded-2xl ${stats.totalKills >= 50 ? 'milestone-unlocked' : ''}`}>
+              <p className="text-[10px] uppercase font-bold opacity-50">Exterminador</p>
+              <p className="text-xs font-black">50 Abates: {stats.totalKills}/50</p>
+              <p className="text-[8px] mt-2 italic">{stats.totalKills >= 50 ? 'BÔNUS: +2 ATK ATIVO' : 'RECOMPENSA: +2 ATK BASE'}</p>
+            </div>
+            <div className={`p-4 bg-slate-900 border-2 border-slate-800 rounded-2xl ${stats.maxFloor >= 15 ? 'milestone-unlocked' : ''}`}>
+              <p className="text-[10px] uppercase font-bold opacity-50">Explorador</p>
+              <p className="text-xs font-black">Andar 15: {stats.maxFloor}/15</p>
+              <p className="text-[8px] mt-2 italic">{stats.maxFloor >= 15 ? 'BÔNUS: +1 VISÃO ATIVO' : 'RECOMPENSA: +1 VISÃO BASE'}</p>
+            </div>
+            <div className={`p-4 bg-slate-900 border-2 border-slate-800 rounded-2xl ${stats.maxLevel >= 10 ? 'milestone-unlocked' : ''}`}>
+              <p className="text-[10px] uppercase font-bold opacity-50">Veterano</p>
+              <p className="text-xs font-black">Nível 10: {stats.maxLevel}/10</p>
+              <p className="text-[8px] mt-2 italic">{stats.maxLevel >= 10 ? 'BÔNUS: +20 HP ATIVO' : 'RECOMPENSA: +20 HP BASE'}</p>
             </div>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
             {CLASSES.map(c => (
               <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all group">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
-                <h3 className="text-xl font-bold mb-1 uppercase tracking-tight">{c.name}</h3>
+                <h3 className="text-xl font-bold mb-1 uppercase tracking-tighter">{c.name}</h3>
+                <div className="text-[9px] text-slate-500 font-bold uppercase">Assumir Legado</div>
               </button>
             ))}
           </div>
-          <button onClick={() => { if(confirm("Apagar tudo?")) { localStorage.clear(); window.location.reload(); } }} className="mt-12 text-[10px] uppercase font-bold text-red-900 hover:text-red-500 transition-colors border-b border-red-900/30 pb-1">Resetar Linhagem</button>
+          <button onClick={() => { if(confirm("Resetar TUDO?")) { localStorage.clear(); window.location.reload(); } }} className="mt-12 text-[9px] uppercase font-bold text-red-900 hover:text-red-500 border-b border-red-900/20">Limpar Registros Históricos</button>
         </div>
       );
 
@@ -314,9 +252,9 @@
                     if (vis) { char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : (c.b ? EMOJIS.blood : EMOJIS[c.t])); op="opacity-100"; }
                     else if (c.v) { char = c.b ? EMOJIS.blood : EMOJIS[c.t]; op="opacity-10 grayscale"; }
                     return (
-                      <div key={x} className={`relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl`}>
+                      <div key={x} className="relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl">
                         <div className={op}>{char}</div>
-                        {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-7 h-1 bg-black rounded-full border border-slate-800 overflow-hidden"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
+                        {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-7 h-1 bg-black rounded-full overflow-hidden border border-slate-800"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
                       </div>
                     );
                   })}
@@ -325,7 +263,7 @@
             </div>
             <div className="w-full lg:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
-                <div className="flex justify-between text-red-500 uppercase mb-1 italic tracking-tighter"><span>Vida Eterna</span><span>Andar {floor}</span></div>
+                <div className="flex justify-between text-red-500 uppercase mb-1 italic"><span>Vida Eterna</span><span>Andar {floor}</span></div>
                 <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
                 <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-center mb-4">
                    <p className="text-emerald-400 mb-1 text-[8px] uppercase tracking-widest font-black">Mochila: {inventory.length}/3 | Combo: {combo}/3</p>
@@ -333,12 +271,9 @@
                 </div>
                 <div className="flex justify-between text-blue-500 uppercase mb-1"><span>NV {p.lvl}</span><span>{Math.floor(p.xp)}/{p.lvl*40}</span></div>
                 <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*40))*100}%`}}></div></div>
-                <div className="flex flex-wrap gap-1 mt-4">
-                   {activePowers.map(i => <div key={i.id} className={`lvl-border border px-1 rounded text-[8px] bg-black/40 lvl-${i.lvl}`}>{POWER_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
-                </div>
               </div>
-              <div className="minimap-bg flex justify-center">
-                <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
+              <div className="minimap-bg flex justify-center p-3">
+                <div className="grid gap-[1px]" style={{gridTemplateColumns: `repeat(${MAP_W}, 1fr)`}}>
                   {map.map((row, y) => row.map((c, x) => {
                     let col = "bg-transparent";
                     if (c.v) {
@@ -354,25 +289,36 @@
               </div>
             </div>
           </div>
+
           {offered.length > 0 && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
-              <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-xl w-full shadow-2xl">
+              <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-xl w-full">
                 <h2 className="text-xl font-black mb-6 uppercase italic text-emerald-400 tracking-widest font-mono">Dádiva de Blackwood</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {offered.map(pu => <button key={pu.id} onClick={() => selectPower(pu)} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center group"><div className="text-3xl mb-1 group-hover:scale-110 transition-transform">{pu.icon}</div><div className="text-xs font-bold uppercase text-white">{pu.name}</div></button>)}
+                  {offered.map(pu => <button key={pu.id} onClick={() => {
+                     const newPowers = [...activePowers];
+                     const exists = newPowers.find(i => i.id === pu.id);
+                     if (exists) exists.lvl = Math.min(5, exists.lvl + 1); else newPowers.push({ id: pu.id, lvl: 1 });
+                     setActivePowers(newPowers);
+                     if (pu.id === 'atk_dmg') setP(v => ({...v, atk: v.atk + 2}));
+                     if (pu.id === 'atk_rng') setP(v => ({...v, range: v.range + 1}));
+                     setOffered([]);
+                  }} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center"><div className="text-3xl mb-1">{pu.icon}</div><div className="text-xs font-bold uppercase text-white">{pu.name}</div></button>)}
                 </div>
               </div>
             </div>
           )}
+
           {p && p.sp > 0 && offered.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
               <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic tracking-tighter">Evolução</h2>
-                <button onClick={()=>{ const updated = {...p, max:p.max+10, hp:p.max+10, sp:p.sp-1}; setP(updated); saveProgress(updated, activePowers, charClass); }} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs">Vitalidade (+10 HP)</button>
-                <button onClick={()=>{ const updated = {...p, atk:p.atk+3, sp:p.sp-1}; setP(updated); saveProgress(updated, activePowers, charClass); }} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Força (+3 ATK)</button>
+                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic tracking-tighter text-center">Evolução</h2>
+                <button onClick={()=>{ setP(v=>({...v, max:v.max+10, hp:v.max+10, sp:v.sp-1})); }} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs">Vitalidade (+10 HP)</button>
+                <button onClick={()=>{ setP(v=>({...v, atk:v.atk+3, sp:v.sp-1})); }} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Força (+3 ATK)</button>
               </div>
             </div>
           )}
+
           {isDead && (
             <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center">
               <h2 className="text-7xl text-red-800 font-black mb-4 uppercase italic tracking-tighter">Caiu</h2>

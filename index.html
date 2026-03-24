@@ -2,18 +2,21 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Eternal Legacy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Lost in Blackwood - Auto Scale</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    body { margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-    .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.5s ease; }
-    .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.5s ease; }
+    body { margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+    .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.4s ease; }
+    .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.4s ease; }
     
-    /* EFEITO TREMOR */
+    /* WRAPPER DE ESCALONAMENTO */
+    #game-container { transform-origin: center center; transition: transform 0.2s ease-out; }
+
+    /* ANIMAÇÕES */
     .shake-fx { animation: shakeAnim 0.3s cubic-bezier(.36,.07,.19,.97) both; }
     @keyframes shakeAnim {
       10%, 90% { transform: translate3d(-2px, 0, 0); }
@@ -21,20 +24,17 @@
       30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
       40%, 60% { transform: translate3d(6px, 0, 0); }
     }
-
-    /* EFEITO FLASH */
     .flash-fx { animation: flashAnim 0.6s ease-out forwards; }
     @keyframes flashAnim {
       0% { background-color: rgba(251, 191, 36, 0.6); }
       100% { background-color: transparent; }
     }
-
     .minimap-bg { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 6px; box-shadow: inset 0 0 10px #000; }
     .milestone-card { background: rgba(15, 23, 42, 0.8); border: 1px solid #1e293b; transition: all 0.3s; }
     .unlocked { border-color: #fbbf24; background: rgba(251, 191, 36, 0.05); }
   </style>
 </head>
-<body class="select-none text-slate-200">
+<body class="select-none text-slate-200 flex items-center justify-center">
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect, useCallback, useRef } = React;
@@ -54,7 +54,7 @@
         let row = [];
         for (let x = 0; x < MAP_W; x++) {
           const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
-          const isSafe = (y === 2 && x < 6); // Área inicial segura
+          const isSafe = (y === 2 && x < 6);
           const isWall = isBorder || (!isSafe && Math.random() < 0.16 && x > 4);
           row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false, b: false });
         }
@@ -80,13 +80,28 @@
       const [inventory, setInventory] = useState([]);
       const [isDead, setIsDead] = useState(false);
       const [combo, setCombo] = useState(0);
-      const [shakeKey, setShakeKey] = useState(0); // Para forçar animação
-      const [flashKey, setFlashKey] = useState(0); // Para forçar animação
+      const [shakeKey, setShakeKey] = useState(0);
+      const [flashKey, setFlashKey] = useState(0);
       const [showMilestones, setShowMilestones] = useState(false);
+      const [scale, setScale] = useState(1);
       const [meta, setMeta] = useState(() => {
         const saved = localStorage.getItem('bw_meta_v4');
         return saved ? JSON.parse(saved) : { totalKills: 0, maxFloor: 0, maxLevel: 0 };
       });
+
+      // LÓGICA DE REDIMENSIONAMENTO
+      useEffect(() => {
+        const handleResize = () => {
+          const gameWidth = 1100; // Largura base da UI
+          const gameHeight = 700; // Altura base da UI
+          const scaleW = window.innerWidth / gameWidth;
+          const scaleH = window.innerHeight / gameHeight;
+          setScale(Math.min(scaleW, scaleH, 1.5)); // Zoom max 1.5x
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      }, []);
 
       const start = (selClass) => {
         let bonus = { atk: meta.totalKills >= 50 ? 2 : 0, vis: meta.maxFloor >= 15 ? 1 : 0, hp: meta.maxLevel >= 10 ? 20 : 0 };
@@ -118,19 +133,16 @@
         if (!p || isDead || p.sp > 0) return;
         const nx = p.x + dx, ny = p.y + dy;
         const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
-        
-        // 1. Verificar Ataque
         let targetE = null;
         for (let r = 1; r <= p.range; r++) {
           let tx = p.x + (dx * r), ty = p.y + (dy * r);
           if (map[ty]?.[tx]?.e && map[ty][tx].e.type !== 'fruit') { targetE = { x: tx, y: ty, e: map[ty][tx].e }; break; }
           if (map[ty]?.[tx]?.t === 'wall') break;
         }
-
         if (targetE) {
           const isCrit = combo >= 3;
           targetE.e.hp -= (isCrit ? p.atk * 2 : p.atk);
-          if (isCrit) setShakeKey(prev => prev + 1);
+          if (isCrit) setShakeKey(v => v + 1);
           if (targetE.e.hp <= 0) {
             map[targetE.y][targetE.x].b = true; 
             const newMeta = { ...meta, totalKills: meta.totalKills + 1 };
@@ -138,35 +150,27 @@
             let nXp = p.xp + targetE.e.xp;
             if (nXp >= p.lvl * 40) { 
                nXp -= (p.lvl * 40); 
-               setFlashKey(prev => prev + 1);
+               setFlashKey(v => v + 1);
                setP(v => ({...v, xp: nXp, lvl: v.lvl + 1, sp: v.sp + 1, f: nf}));
             } else { setP(v => ({...v, xp: nXp, f: nf})); }
             setCombo(c => c + 1); map[targetE.y][targetE.x].e = null;
           } else { setP(v => ({...v, f: nf})); }
           processAI(p.x, p.y); return;
         }
-
-        // 2. Verificar Movimento
         const cell = map[ny]?.[nx];
-        if (!cell || cell.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
-        
+        if (!cell || cell.t === 'wall') { setP(v => ({...prev, f: nf})); return; }
         if (cell.t === 'stairs') {
-          const nextF = floor + 1; setFloor(nextF);
-          if (nextF > meta.maxFloor) { const m = {...meta, maxFloor: nextF}; setMeta(m); localStorage.setItem('bw_meta_v4', JSON.stringify(m)); }
-          setMap(generateLevel(nextF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN'}));
+          const nF = floor + 1; setFloor(nF);
+          if (nF > meta.maxFloor) { const m = {...meta, maxFloor: nF}; setMeta(m); localStorage.setItem('bw_meta_v4', JSON.stringify(m)); }
+          setMap(generateLevel(nF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN'}));
           return;
         }
-
-        let newInv = [...inventory];
-        let newHp = p.hp;
+        let newInv = [...inventory], newHp = p.hp;
         if (cell.e?.type === 'fruit') {
-          if (newInv.length < 3) newInv.push('apple');
-          else newHp = Math.min(p.max, p.hp + 15);
-          cell.e = null; // COMIDA COLETADA - CAMINHO LIVRE
+          if (newInv.length < 3) newInv.push('apple'); else newHp = Math.min(p.max, p.hp + 15);
+          cell.e = null;
         }
-
-        setP(v => ({...v, x: nx, y: ny, f: nf, hp: newHp}));
-        setInventory(newInv);
+        setP(v => ({...v, x: nx, y: ny, f: nf, hp: newHp})); setInventory(newInv);
         processAI(nx, ny);
       };
 
@@ -203,38 +207,33 @@
       }, [p, map, inventory, isDead, combo]);
 
       if (!charClass) return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6">
-          <h1 className="text-6xl font-black text-red-600 mb-8 italic uppercase tracking-tighter">Lost in Blackwood</h1>
-          <div className="flex gap-4 mb-8">
-            <button onClick={() => setShowMilestones(false)} className={`px-8 py-2 rounded-full text-sm font-bold uppercase transition ${!showMilestones ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-500'}`}>Herdeiros</button>
-            <button onClick={() => setShowMilestones(true)} className={`px-8 py-2 rounded-full text-sm font-bold uppercase transition ${showMilestones ? 'bg-yellow-600 text-white' : 'bg-slate-900 text-slate-500'}`}>Conquistas</button>
+        <div id="game-container" style={{transform: `scale(${scale})`}} className="flex flex-col items-center justify-center p-6 text-center">
+          <h1 className="text-7xl font-black text-red-600 mb-12 italic uppercase tracking-tighter">Lost in Blackwood</h1>
+          <div className="flex gap-4 mb-10">
+            <button onClick={() => setShowMilestones(false)} className={`px-10 py-3 rounded-full text-sm font-bold uppercase transition ${!showMilestones ? 'bg-red-600 shadow-lg' : 'bg-slate-900 text-slate-500'}`}>Herdeiros</button>
+            <button onClick={() => setShowMilestones(true)} className={`px-10 py-3 rounded-full text-sm font-bold uppercase transition ${showMilestones ? 'bg-yellow-600 shadow-lg' : 'bg-slate-900 text-slate-500'}`}>Conquistas</button>
           </div>
-
           {!showMilestones ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
+            <div className="grid grid-cols-3 gap-8 w-[900px]">
               {CLASSES.map(c => (
-                <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-8 rounded-3xl hover:border-red-600 transition-all group">
-                  <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
-                  <h3 className="text-2xl font-bold uppercase">{c.name}</h3>
-                  <p className="text-[10px] text-slate-500 mt-2 font-bold tracking-widest">REIVINDICAR SANGUE</p>
+                <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-10 rounded-[40px] hover:border-red-600 transition-all group shadow-2xl">
+                  <div className="text-8xl mb-6 group-hover:scale-110 transition-transform">{c.icon}</div>
+                  <h3 className="text-3xl font-black uppercase mb-2">{c.name}</h3>
+                  <p className="text-xs text-slate-500 font-bold tracking-widest">ASSUMIR LINHAGEM</p>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-5xl">
-              {[
-                { name: 'Exterminador', target: 50, val: meta.totalKills, desc: '+2 ATK Base', icon: '💀' },
-                { name: 'Explorador', target: 15, val: meta.maxFloor, desc: '+1 Visão Base', icon: '👁️' },
-                { name: 'Veterano', target: 10, val: meta.maxLevel, desc: '+20 HP Base', icon: '🩸' },
-              ].map((m, i) => (
-                <div key={i} className={`p-6 rounded-3xl milestone-card ${m.val >= m.target ? 'unlocked' : 'opacity-40'}`}>
-                  <div className="text-3xl mb-2">{m.icon}</div>
-                  <p className="font-black uppercase text-white">{m.name}</p>
-                  <p className="text-xs text-slate-400">{m.desc}</p>
-                  <div className="w-full bg-black h-2 rounded-full mt-4 overflow-hidden">
-                    <div className="bg-yellow-500 h-full" style={{width: `${Math.min(100, (m.val/m.target)*100)}%`}}></div>
+            <div className="grid grid-cols-3 gap-6 w-[1000px]">
+              {[{n:'Exterminador',t:50,v:meta.totalKills,d:'+2 ATK',i:'💀'},{n:'Explorador',t:15,v:meta.maxFloor,d:'+1 VISÃO',i:'👁️'},{n:'Veterano',t:10,v:meta.maxLevel,d:'+20 HP',i:'🩸'}].map((m,i)=>(
+                <div key={i} className={`p-8 rounded-[35px] milestone-card ${m.v>=m.t?'unlocked':'opacity-30'}`}>
+                  <div className="text-5xl mb-4">{m.i}</div>
+                  <p className="text-xl font-black uppercase mb-1">{m.n}</p>
+                  <p className="text-sm text-slate-400 mb-6">{m.d}</p>
+                  <div className="w-full bg-black h-3 rounded-full overflow-hidden">
+                    <div className="bg-yellow-500 h-full" style={{width:`${Math.min(100,(m.v/m.t)*100)}%`}}></div>
                   </div>
-                  <p className="text-[10px] mt-2 font-bold text-yellow-600">{m.val} / {m.target}</p>
+                  <p className="text-xs mt-3 font-bold text-yellow-600">{m.v} / {m.t}</p>
                 </div>
               ))}
             </div>
@@ -243,25 +242,23 @@
       );
 
       return (
-        <div key={flashKey} className={`flex flex-col items-center justify-center min-h-screen p-4 ${flashKey > 0 ? 'flash-fx' : ''}`}>
-          <div key={shakeKey} className={`flex flex-col lg:flex-row gap-8 ${shakeKey > 0 ? 'shake-fx' : ''}`}>
+        <div key={flashKey} className={`w-full h-full flex flex-col items-center justify-center ${flashKey>0?'flash-fx':''}`}>
+          <div id="game-container" key={shakeKey} style={{transform: `scale(${scale})`}} className={`flex gap-12 items-start ${shakeKey>0?'shake-fx':''}`}>
+            
             {/* MAPA */}
-            <div className="bg-black border-4 border-slate-900 p-1 rounded-3xl shadow-2xl overflow-hidden relative">
+            <div className="bg-black border-[6px] border-slate-900 p-1.5 rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden relative">
               {map.map((row, y) => (
                 <div key={y} className="flex">
                   {row.map((c, x) => {
                     const vis = isVisible(x, y); if (vis) c.v = true;
-                    let char = "⬛"; let op = "opacity-0";
-                    if (vis) { 
-                      char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : (c.b ? EMOJIS.blood : EMOJIS[c.t])); 
-                      op="opacity-100"; 
-                    } else if (c.v) { char = c.b ? EMOJIS.blood : EMOJIS[c.t]; op="opacity-10 grayscale"; }
-                    
+                    let ch = "⬛"; let op = "opacity-0";
+                    if (vis) { ch = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : (c.b ? EMOJIS.blood : EMOJIS[c.t])); op="opacity-100"; }
+                    else if (c.v) { ch = c.b ? EMOJIS.blood : EMOJIS[c.t]; op="opacity-10 grayscale"; }
                     return (
-                      <div key={x} className={`relative w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-2xl`}>
-                        <div className={`${op} ${c.b && vis ? 'brightness-75' : ''}`}>{char}</div>
+                      <div key={x} className="relative w-10 h-10 flex items-center justify-center text-3xl">
+                        <div className={`${op} ${c.b && vis ? 'brightness-75' : ''}`}>{ch}</div>
                         {c.e && vis && c.e.hp < c.e.maxHp && (
-                          <div className="absolute -top-1 w-8 h-1 bg-black rounded-full overflow-hidden border border-slate-800">
+                          <div className="absolute -top-1 w-9 h-1.5 bg-black rounded-full overflow-hidden border border-slate-800">
                              <div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div>
                           </div>
                         )}
@@ -272,61 +269,61 @@
               ))}
             </div>
 
-            {/* STATUS */}
-            <div className="w-full lg:w-80 flex flex-col gap-6 font-mono">
-              <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
-                <div className="flex justify-between text-red-500 uppercase font-black text-xs mb-2"><span>Vitalidade</span><span>{Math.max(0, p.hp)}/{p.max}</span></div>
-                <div className="w-full bg-black h-4 rounded-full overflow-hidden border border-slate-800 p-1 mb-6 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
+            {/* INTERFACE LATERAL */}
+            <div className="w-[320px] flex flex-col gap-6 font-mono">
+              <div className="bg-slate-900 p-8 rounded-[40px] border border-slate-800 shadow-2xl">
+                <div className="flex justify-between text-red-500 uppercase font-black text-sm mb-3"><span>Vitalidade</span><span>{Math.max(0, p.hp)}/{p.max}</span></div>
+                <div className="w-full bg-black h-5 rounded-full overflow-hidden border-2 border-slate-800 p-1 mb-8"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
                 
-                <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 text-center mb-6">
-                   <p className="text-emerald-400 text-[10px] uppercase font-black tracking-widest mb-2">Mochila: {inventory.length}/3 | Combo: {combo}/3</p>
-                   <div className="flex justify-center gap-2 text-2xl mb-2">
+                <div className="bg-slate-800/80 p-5 rounded-[30px] border border-slate-700 text-center mb-8 shadow-inner">
+                   <p className="text-emerald-400 text-xs uppercase font-black tracking-widest mb-3">Mochila: {inventory.length}/3</p>
+                   <div className="flex justify-center gap-3 text-4xl mb-3">
                     {inventory.map((_,i)=><span key={i}>🍎</span>)}
-                    {inventory.length===0 && <span className="opacity-10">Vazio</span>}
+                    {inventory.length===0 && <span className="opacity-10 text-2xl uppercase">Vazia</span>}
                    </div>
-                   <p className="text-white text-[10px] animate-pulse">PRESS [H] PARA CURAR</p>
+                   <p className="text-white text-[10px] animate-pulse font-black mt-2">PRESSIONE [H] PARA CURAR</p>
                 </div>
 
-                <div className="flex justify-between text-blue-400 uppercase font-black text-xs mb-2"><span>Nível {p.lvl}</span><span>{Math.floor(p.xp)}/{(p.lvl*40)}</span></div>
-                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*40))*100}%`}}></div></div>
+                <div className="flex justify-between text-blue-400 uppercase font-black text-xs mb-2"><span>Legado Nível {p.lvl}</span><span>{Math.floor(p.xp)}/{(p.lvl*40)}</span></div>
+                <div className="w-full bg-black h-4 rounded-full border border-slate-800 p-0.5"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*40))*100}%`}}></div></div>
               </div>
 
-              <div className="minimap-bg flex justify-center p-4">
+              <div className="minimap-bg p-6 flex flex-col items-center">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns: `repeat(${MAP_W}, 1fr)`}}>
                   {map.map((row, y) => row.map((c, x) => {
                     let col = "bg-transparent";
                     if (c.v) {
                       if (p.x===x && p.y===y) col = "bg-emerald-400";
                       else if (c.e && c.e.type !== 'fruit' && isVisible(x,y)) col = "bg-red-600";
-                      else if (c.t==='stairs') col = "bg-yellow-400 shadow-[0_0_5px_gold]";
+                      else if (c.t==='stairs') col = "bg-yellow-400 shadow-[0_0_8px_gold]";
                       else if (c.t==='wall') col = "bg-slate-700";
                       else col = "bg-slate-900";
                     }
-                    return <div key={`${x}-${y}`} className={`w-[6px] h-[6px] rounded-[1px] ${col}`}></div>;
+                    return <div key={`${x}-${y}`} className={`w-[7px] h-[7px] rounded-[1px] ${col}`}></div>;
                   }))}
                 </div>
+                <div className="mt-6 text-[11px] uppercase font-black text-slate-500 tracking-[0.3em] italic">Andar {floor}</div>
               </div>
-              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 text-[10px] uppercase font-black text-slate-500 text-center italic tracking-widest">Andar {floor}</div>
             </div>
           </div>
 
           {/* LEVEL UP */}
           {p.sp > 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-6">
-              <div className="bg-slate-900 border-2 border-red-600 p-10 rounded-[40px] text-center max-w-sm w-full shadow-2xl">
-                <h2 className="text-3xl text-red-500 font-black mb-8 uppercase italic tracking-tighter">Evolução</h2>
-                <button onClick={()=>{ setP(v=>({...v, max:v.max+20, hp:v.hp+20, sp:v.sp-1})); }} className="w-full mb-4 bg-red-900/20 border-2 border-red-600 text-red-500 py-5 rounded-3xl hover:bg-red-600 hover:text-white font-black uppercase text-sm transition-all">Sangue (+20 HP)</button>
-                <button onClick={()=>{ setP(v=>({...v, atk:v.atk+4, sp:v.sp-1})); }} className="w-full bg-slate-800 border-2 border-slate-700 text-slate-300 py-5 rounded-3xl hover:bg-slate-200 hover:text-black font-black uppercase text-sm transition-all">Força (+4 ATK)</button>
+              <div className="bg-slate-900 border-4 border-red-600 p-12 rounded-[60px] text-center max-w-sm w-full shadow-[0_0_100px_rgba(220,38,38,0.3)]">
+                <h2 className="text-4xl text-red-500 font-black mb-10 uppercase italic tracking-tighter">Evolução</h2>
+                <button onClick={()=>{ setP(v=>({...v, max:v.max+20, hp:v.hp+20, sp:v.sp-1})); }} className="w-full mb-6 bg-red-900/20 border-2 border-red-600 text-red-500 py-6 rounded-3xl hover:bg-red-600 hover:text-white font-black uppercase text-lg transition-all shadow-lg">Sangue (+20 HP)</button>
+                <button onClick={()=>{ setP(v=>({...v, atk:v.atk+4, sp:v.sp-1})); }} className="w-full bg-slate-800 border-2 border-slate-700 text-slate-300 py-6 rounded-3xl hover:bg-slate-200 hover:text-black font-black uppercase text-lg transition-all shadow-lg">Força (+4 ATK)</button>
               </div>
             </div>
           )}
 
           {/* DEATH */}
           {isDead && (
-            <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[200] p-6 text-center">
-              <h2 className="text-8xl text-red-800 font-black mb-4 uppercase italic tracking-tighter">Caiu</h2>
-              <p className="text-slate-500 mb-10 text-xl font-bold">Andar {floor} foi o seu fim.</p>
-              <button onClick={() => start(charClass)} className="px-16 py-6 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-4 border-red-600 shadow-2xl uppercase tracking-widest text-xl">Assumir Herança</button>
+            <div className="fixed inset-0 bg-black/98 flex flex-col items-center justify-center z-[200] p-6 text-center">
+              <h2 className="text-[120px] text-red-800 font-black mb-4 uppercase italic tracking-tighter leading-none">Caiu</h2>
+              <p className="text-slate-500 mb-12 text-2xl font-bold uppercase tracking-widest italic">A linhagem aguarda um novo herdeiro.</p>
+              <button onClick={() => start(charClass)} className="px-20 py-8 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-4 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.4)] uppercase tracking-[0.3em] text-2xl">Assumir Herança</button>
             </div>
           )}
         </div>

@@ -18,11 +18,9 @@
     .lvl-border { border-width: 2px; border-style: solid; }
     .lvl-1 { border-color: #64748b; } .lvl-2 { border-color: #22c55e; } .lvl-3 { border-color: #3b82f6; } 
     .lvl-4 { border-color: #a855f7; } .lvl-5 { border-color: #f97316; }
-    .death-overlay { animation: fadeIn 2s forwards; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
-<body class="select-none">
+<body class="select-none text-slate-200">
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect, useCallback } = React;
@@ -31,8 +29,8 @@
     
     const CLASSES = [
       { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 40, max: 40, atk: 5, range: 2, vis: 8, def: 0 } },
-      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 60, max: 60, atk: 6, range: 1, vis: 5, def: 2 } },
-      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 30, max: 30, atk: 10, range: 1, vis: 6, def: 0 } }
+      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 65, max: 65, atk: 6, range: 1, vis: 5, def: 2 } },
+      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 35, max: 35, atk: 10, range: 1, vis: 6, def: 0 } }
     ];
 
     const POWER_CATALOG = [
@@ -66,10 +64,8 @@
         map.push(row);
       }
       map[sPos.y][sPos.x].t = 'stairs';
-      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.03 && c.x > 3) c.e = { type: 'fruit' }; }));
-      
-      // MAIS INIMIGOS E MAIS FORTES
-      for (let i = 0; i < 8 + (floor * 2); i++) {
+      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04 && c.x > 3 && c.t !== 'stairs') c.e = { type: 'fruit' }; }));
+      for (let i = 0; i < 6 + (floor * 2); i++) {
         let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
         if (map[ry][rx].t === 'floor' && !map[ry][rx].e && (Math.abs(rx - pStart.x) > 4)) {
           const base = ENEMY_BASE[Math.floor(Math.random() * ENEMY_BASE.length)];
@@ -89,12 +85,10 @@
       const [offered, setOffered] = useState([]);
       const [isDead, setIsDead] = useState(false);
 
-      // CARREGAR PROGRESSO ETERNO
       useEffect(() => {
         const savedP = localStorage.getItem('eternal_player');
         const savedPowers = localStorage.getItem('eternal_powers');
         const savedClass = localStorage.getItem('eternal_class');
-        
         if (savedP && savedPowers && savedClass) {
           setP(JSON.parse(savedP));
           setActivePowers(JSON.parse(savedPowers));
@@ -103,8 +97,15 @@
         }
       }, []);
 
+      const resetGame = () => {
+        if(confirm("Deseja realmente APAGAR sua linhagem eterna? Todo o progresso será perdido.")) {
+          localStorage.clear();
+          window.location.reload();
+        }
+      };
+
       const saveProgress = (player, powers, cClass) => {
-        localStorage.setItem('eternal_player', JSON.stringify({...player, hp: player.max})); // Salva curado
+        localStorage.setItem('eternal_player', JSON.stringify({...player, hp: player.max}));
         localStorage.setItem('eternal_powers', JSON.stringify(powers));
         localStorage.setItem('eternal_class', JSON.stringify(cClass));
       };
@@ -123,7 +124,6 @@
         const exists = newPowers.find(i => i.id === pu.id);
         if (exists) exists.lvl = Math.min(5, exists.lvl + 1);
         else newPowers.push({ id: pu.id, lvl: 1 });
-        
         setActivePowers(newPowers);
         let updatedP = { ...p };
         if (pu.id === 'atk_dmg') updatedP.atk += 2;
@@ -165,10 +165,9 @@
           const leach = activePowers.find(i => i.id === 'atk_lch');
           if (leach) setP(v => ({...v, hp: Math.min(v.max, v.hp + leach.lvl), f: nf}));
           else setP(v => ({...v, f: nf}));
-
           if (targetEnemy.e.hp <= 0) {
             let nXp = p.xp + targetEnemy.e.xp, nLvl = p.lvl, nSp = p.sp;
-            if (nXp >= p.lvl * 25) { nXp -= (p.lvl * 25); nLvl++; nSp++; }
+            if (nXp >= p.lvl * 30) { nXp -= (p.lvl * 30); nLvl++; nSp++; }
             setP(v => ({...v, xp: nXp, lvl: nLvl, sp: nSp, f: nf}));
             map[targetEnemy.y][targetEnemy.x].e = null;
           }
@@ -177,19 +176,15 @@
 
         const cell = map[ny]?.[nx];
         if (!cell || cell.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
-        
         if (cell.t === 'stairs') {
-          const nextF = floor + 1;
-          setFloor(nextF);
+          const nextF = floor + 1; setFloor(nextF);
           const regen = activePowers.find(i => i.id === 'hp_reg');
           let healedHp = p.hp;
           if (regen) healedHp = Math.min(p.max, p.hp + Math.floor(p.max * (0.05 * regen.lvl)));
-          setMap(generateMap(nextF));
-          setP(v => ({...v, x: 2, y: 2, f: 'DOWN', hp: healedHp}));
+          setMap(generateMap(nextF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN', hp: healedHp}));
           setOffered([...POWER_CATALOG].sort(() => 0.5 - Math.random()).slice(0, 3));
           return;
         }
-
         if (cell.e?.type === 'fruit') {
           if (inventory.length < 3) setInventory(v => [...v, 'apple']);
           else setP(v => ({...v, hp: Math.min(v.max, v.hp + 12)}));
@@ -203,19 +198,13 @@
         let dmgTaken = 0;
         const resPower = activePowers.find(i => i.id === 'def_res')?.lvl || 0;
         const rflPower = activePowers.find(i => i.id === 'def_rfl')?.lvl || 0;
-
         const newMap = map.map(row => row.map(c => {
           if (c.e && !['fruit', 'player'].includes(c.e.type)) {
             const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
             if (dx <= 1 && dy <= 1) {
               let hit = Math.max(1, c.e.dmg - (p.def + resPower));
               dmgTaken += hit;
-              if (rflPower > 0) {
-                c.e.hp -= Math.floor(hit * (0.2 * rflPower));
-                if (c.e.hp <= 0) return { ...c, e: null };
-              }
-              // DIFICULDADE: Inimigos tem 30% chance de bater de novo
-              if (Math.random() < 0.3) dmgTaken += Math.floor(hit * 0.5);
+              if (rflPower > 0) { c.e.hp -= Math.floor(hit * (0.2 * rflPower)); if (c.e.hp <= 0) return { ...c, e: null }; }
             } else {
               const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
               if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) 
@@ -236,7 +225,7 @@
              setInventory(v => v.slice(1)); setP(v => ({...v, hp: Math.min(v.max, v.hp + 20)})); 
           }
           const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
-          if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
+          if (k[e.key]) move(...k[e.key]);
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
@@ -244,17 +233,39 @@
 
       if (!charClass) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 text-center">
-          <h1 className="text-5xl font-black text-red-600 mb-4 italic tracking-tighter">LOST IN BLACKWOOD</h1>
-          <p className="text-slate-500 mb-10 text-xs uppercase tracking-[0.4em]">Sua linhagem é eterna. A morte é apenas o recomeço.</p>
+          <h1 className="text-5xl font-black text-red-600 mb-2 italic tracking-tighter uppercase">Lost in Blackwood</h1>
+          
+          {/* PAINEL DE HERANÇA */}
+          <div className="mb-8 p-4 bg-slate-900/50 border border-slate-800 rounded-2xl max-w-md w-full">
+            <h2 className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-3">Memória da Linhagem</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-left bg-black/40 p-3 rounded-xl border border-red-900/30">
+                 <p className="text-[10px] text-red-500 font-bold uppercase">Atributos Salvos</p>
+                 <p className="text-sm font-black">❤️ HP: {p ? p.max : '--'}</p>
+                 <p className="text-sm font-black">⚔️ ATK: {p ? p.atk : '--'}</p>
+              </div>
+              <div className="text-left bg-black/40 p-3 rounded-xl border border-blue-900/30">
+                 <p className="text-[10px] text-blue-500 font-bold uppercase">Habilidades</p>
+                 <div className="flex gap-1 mt-1">
+                   {activePowers.length > 0 ? activePowers.map(pow => <span key={pow.id} title={pow.id}>{POWER_CATALOG.find(x=>x.id===pow.id).icon}</span>) : <span className="text-[10px] text-slate-600 italic">Vazio</span>}
+                 </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
             {CLASSES.map(c => (
-              <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all group">
+              <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all group relative overflow-hidden">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
-                <h3 className="text-xl font-bold mb-2 uppercase">{c.name}</h3>
-                <div className="text-[10px] text-slate-400">Status Base</div>
+                <h3 className="text-xl font-bold mb-1 uppercase">{c.name}</h3>
+                <div className="text-[9px] text-slate-500 font-bold tracking-widest uppercase">Selecionar Herdeiro</div>
               </button>
             ))}
           </div>
+
+          <button onClick={resetGame} className="mt-12 text-[10px] uppercase font-bold text-red-900 hover:text-red-500 transition-colors border-b border-red-900/30 pb-1">
+            Apagar Linhagem e Recomeçar do Zero
+          </button>
         </div>
       );
 
@@ -283,9 +294,9 @@
             <div className="w-full lg:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
                 <div className="flex justify-between text-red-500 uppercase mb-1 italic"><span>Linhagem Eterna</span><span>Andar {floor}</span></div>
-                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
-                <div className="flex justify-between text-blue-500 uppercase mb-1"><span>Poder Acumulado</span><span>NV {p.lvl}</span></div>
-                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*25))*100}%`}}></div></div>
+                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
+                <div className="flex justify-between text-blue-500 uppercase mb-1"><span>NV {p.lvl}</span><span>{Math.floor(p.xp)}/{p.lvl*30}</span></div>
+                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*30))*100}%`}}></div></div>
                 <div className="flex flex-wrap gap-1 mt-4">
                    {activePowers.map(i => <div key={i.id} className={`lvl-border border px-1 rounded text-[8px] bg-black/40 lvl-${i.lvl}`}>{POWER_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
                 </div>
@@ -312,8 +323,8 @@
           {offered.length > 0 && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
               <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-xl w-full">
-                <h2 className="text-xl font-black mb-6 uppercase italic tracking-widest text-emerald-400 font-mono">Poder Herdado</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
+                <h2 className="text-xl font-black mb-6 uppercase italic text-emerald-400">Poder de Andar</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {offered.map(pu => <button key={pu.id} onClick={() => selectPower(pu)} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center"><div className="text-3xl mb-1">{pu.icon}</div><div className="text-xs font-bold uppercase">{pu.name}</div></button>)}
                 </div>
               </div>
@@ -323,24 +334,25 @@
           {p && p.sp > 0 && offered.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
               <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Herança de Sangue</h2>
-                <button onClick={()=>{
-                  const updated = {...p, max:p.max+10, hp:p.max+10, sp:p.sp-1};
-                  setP(updated); saveProgress(updated, activePowers, charClass);
-                }} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 font-bold uppercase text-xs">Aprimorar Vitalidade (+10 HP)</button>
-                <button onClick={()=>{
-                  const updated = {...p, atk:p.atk+3, sp:p.sp-1};
-                  setP(updated); saveProgress(updated, activePowers, charClass);
-                }} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aprimorar Força (+3 Dano)</button>
+                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2>
+                <button onClick={()=>{ const updated = {...p, max:p.max+10, hp:p.max+10, sp:p.sp-1}; setP(updated); saveProgress(updated, activePowers, charClass); }} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs">Aprimorar Vitalidade (+10 HP)</button>
+                <button onClick={()=>{ const updated = {...p, atk:p.atk+3, sp:p.sp-1}; setP(updated); saveProgress(updated, activePowers, charClass); }} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aprimorar Força (+3 Dano)</button>
               </div>
             </div>
           )}
 
           {isDead && (
-            <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center death-overlay">
-              <h2 className="text-7xl text-red-800 font-black mb-4 uppercase italic">Corpo Caído</h2>
-              <p className="text-slate-500 mb-8 italic max-w-md">Seus ossos repousam em Blackwood, mas sua força foi transmitida para o próximo da sua linhagem.</p>
-              <button onClick={() => { setIsDead(false); setFloor(1); setMap(generateMap(1)); setInventory([]); }} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600 shadow-lg uppercase tracking-widest">Reivindicar Herança</button>
+            <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center">
+              <h2 className="text-7xl text-red-800 font-black mb-4 uppercase italic">Morto</h2>
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl mb-8 max-w-sm w-full">
+                 <p className="text-xs text-slate-500 uppercase font-bold mb-4 tracking-widest">Atributos Legados</p>
+                 <div className="flex justify-around text-sm font-black mb-4">
+                    <span className="text-red-500">❤️ {p.max} HP</span>
+                    <span className="text-orange-500">⚔️ {p.atk} ATK</span>
+                 </div>
+                 <p className="text-[10px] text-slate-600 italic">Esses valores serão a base da sua próxima vida.</p>
+              </div>
+              <button onClick={() => { setIsDead(false); setFloor(1); setMap(generateMap(1)); setInventory([]); }} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600 shadow-lg uppercase tracking-widest">Assumir Herança</button>
             </div>
           )}
         </div>

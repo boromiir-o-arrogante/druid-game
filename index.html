@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Full HUD</title>
+  <title>Lost in Blackwood - Mega Update</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -12,14 +12,11 @@
     body { margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
     .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.5s ease; }
     .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.5s ease; }
-    .lvl-1 { border-color: #64748b; color: #f1f5f9; }
-    .lvl-2 { border-color: #22c55e; color: #bbf7d0; box-shadow: 0 0 5px #22c55e; }
-    .lvl-3 { border-color: #3b82f6; color: #bfdbfe; box-shadow: 0 0 8px #3b82f6; }
-    .lvl-4 { border-color: #a855f7; color: #e9d5ff; box-shadow: 0 0 12px #a855f7; }
-    .lvl-5 { border-color: #f97316; color: #fed7aa; box-shadow: 0 0 20px #f97316; }
+    .minimap-pixel { width: 6px; height: 6px; border-radius: 1px; }
+    .lvl-1 { border-color: #64748b; } .lvl-2 { border-color: #22c55e; } .lvl-3 { border-color: #3b82f6; } 
+    .lvl-4 { border-color: #a855f7; } .lvl-5 { border-color: #f97316; }
     @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.2); background-color: #d8b4fe; } }
     .animate-boss-radar { animation: pulse-purple 0.8s infinite; }
-    .minimap-pixel { width: 6px; height: 6px; border-radius: 1px; }
   </style>
 </head>
 <body class="select-none">
@@ -28,216 +25,198 @@
     const { useState, useEffect, useCallback } = React;
 
     const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", stairs: "🪜", fruit: "🍎", boss: "👿" };
-    const POWER_UPS_CATALOG = [
-      { id: 'atk_dmg', name: 'Força Bruta', icon: '⚔️', desc: '+2 Dano Base' },
-      { id: 'atk_rng', name: 'Alcance', icon: '🏹', desc: '+1 Distância Atq' },
-      { id: 'atk_lch', name: 'Drenar', icon: '🩸', desc: 'Atq cura +1 HP' },
+    const CLASSES = [
+      { id: 'exp', name: 'Explorador', icon: '👦', desc: 'Mais visão e alcance.', stats: { hp: 30, atk: 4, range: 2, vis: 7, def: 0 } },
+      { id: 'war', name: 'Guerreiro', icon: '🛡️', desc: 'Tanque com muita vida.', stats: { hp: 50, atk: 5, range: 1, vis: 5, def: 1 } },
+      { id: 'hun', name: 'Caçador', icon: '🏹', desc: 'Alto dano, pouca vida.', stats: { hp: 25, atk: 8, range: 1, vis: 5, def: 0 } }
+    ];
+    const POWER_UPS = [
+      { id: 'atk_dmg', name: 'Força', icon: '⚔️', desc: '+2 Dano' },
+      { id: 'atk_rng', name: 'Alcance', icon: '🏹', desc: '+1 Alcance' },
+      { id: 'atk_lch', name: 'Drenar', icon: '🩸', desc: 'Cura no Atq' },
       { id: 'def_res', name: 'Couraça', icon: '🛡️', desc: '-1 Dano Rec.' },
-      { id: 'def_rfl', name: 'Espinhos', icon: '✨', desc: 'Reflete 20% Dano' },
-      { id: 'hp_reg', name: 'Regeneração', icon: '❤️', desc: 'Cura 5% por andar' }
+      { id: 'def_rfl', name: 'Espinhos', icon: '✨', desc: 'Reflete Dano' },
+      { id: 'hp_reg', name: 'Regen', icon: '❤️', desc: 'Cura por Andar' }
     ];
 
     const MAP_W = 24; const MAP_H = 14; 
-    const ENEMY_TYPES = [
-      { type: 'bat', hp: 5, xp: 4, dmg: 2, name: 'Morcego' },
-      { type: 'slime', hp: 8, xp: 6, dmg: 3, name: 'Slime' },
-      { type: 'goblin', hp: 14, xp: 10, dmg: 4, name: 'Goblin' },
-      { type: 'orc', hp: 25, xp: 15, dmg: 6, name: 'Orc' }
-    ];
 
-    const generateLevelMap = (floor) => {
+    const generateMap = (floor) => {
       let map = [];
+      const isFogLevel = Math.random() < 0.2 && floor > 1;
       for (let y = 0; y < MAP_H; y++) {
         let row = [];
         for (let x = 0; x < MAP_W; x++) {
           const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
-          const isWall = isBorder || (Math.random() < 0.17 && x > 4);
-          row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
+          row.push({ x, y, t: isBorder || (Math.random() < 0.17 && x > 4) ? 'wall' : 'floor', e: null, v: false });
         }
         map.push(row);
       }
-      map.forEach(r => r.forEach(c => { if (c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' }; }));
-      if (Math.random() < 0.20) {
-        let bx = Math.floor(Math.random() * 8) + 12, by = Math.floor(Math.random() * 8) + 3;
-        if(map[by]?.[bx]?.t === 'floor') {
-          const bHp = 50 + (floor * 25);
-          map[by][bx].e = { type: 'boss', hp: bHp, maxHp: bHp, dmg: 6 + Math.floor(floor * 1.5), xp: 50 + (floor * 5), name: 'ANCIÃO' };
-        }
-      }
-      for (let i = 0; i < 6 + floor; i++) {
-        let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
-        if (map[ry]?.[rx]?.t === 'floor' && !map[ry][rx].e) {
-          const base = ENEMY_TYPES[Math.floor(Math.random() * Math.min(floor, 4))];
-          const eHp = base.hp + (floor * 2);
-          map[ry][rx].e = { ...base, hp: eHp, maxHp: eHp, dmg: base.dmg + Math.floor(floor/2) };
-        }
+      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' }; }));
+      if (Math.random() < (0.15 + (floor * 0.02))) {
+        let bx = 15, by = 7;
+        map[by][bx].e = { type: 'boss', hp: 50+(floor*25), maxHp: 50+(floor*25), dmg: 6+floor, xp: 60+(floor*5), name: 'ANCIÃO' };
       }
       map[MAP_H-2][MAP_W-2].t = 'stairs';
-      return map;
+      return { map, isFogLevel };
     };
 
     function App() {
+      const [charClass, setCharClass] = useState(null);
       const [floor, setFloor] = useState(1);
-      const [p, setP] = useState({ x: 2, y: 2, hp: 35, max: 35, atk: 5, range: 1, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
-      const [map, setMap] = useState(() => generateLevelMap(1));
-      const [log, setLog] = useState(["Radar ativo. Olhe o mini-mapa."]);
-      const [inventory, setInventory] = useState([]); 
-      const [offeredPowerUps, setOfferedPowerUps] = useState([]);
-      const [pendingPowerUp, setPendingPowerUp] = useState(null);
+      const [p, setP] = useState(null);
+      const [mapData, setMapData] = useState({ map: [], isFogLevel: false });
+      const [inventory, setInventory] = useState([]); // Maçãs guardadas
+      const [powers, setPowers] = useState([]);
+      const [offeredPowers, setOfferedPowers] = useState([]);
+      const [log, setLog] = useState([]);
+      const [highScore, setHighScore] = useState(localStorage.getItem('bw_high') || 1);
 
-      const isVisible = (x, y, player) => {
-        const dx = Math.abs(x - player.x), dy = Math.abs(y - player.y);
+      const selectClass = (c) => {
+        setCharClass(c);
+        setP({ ...c.stats, max: c.stats.hp, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' });
+        setMapData(generateMap(1));
+        setLog(["Bem-vindo a Blackwood. Use H para curar se tiver maçãs."]);
+      };
+
+      const isVisible = (x, y) => {
+        if (!p) return false;
+        const dx = Math.abs(x - p.x), dy = Math.abs(y - p.y);
+        const radius = mapData.isFogLevel ? 2 : p.vis;
         if (dx <= 1 && dy <= 1) return true;
-        if (dx > 5 || dy > 5) return false;
-        if (player.f === 'UP' && y < player.y && dx <= dy) return true;
-        if (player.f === 'DOWN' && y > player.y && dx <= dy) return true;
-        if (player.f === 'LEFT' && x < player.x && dy <= dx) return true;
-        if (player.f === 'RIGHT' && x > player.x && dy <= dx) return true;
-        return false;
+        if (dx > radius || dy > radius) return false;
+        return true;
       };
 
-      const applyPowerUp = (puId) => {
-        setInventory(prev => {
-          const item = prev.find(i => i.id === puId);
-          if (item) return prev.map(i => i.id === puId ? { ...i, lvl: Math.min(5, i.lvl + 1) } : i);
-          return [...prev, { id: puId, lvl: 1 }];
-        });
-        if (puId === 'atk_dmg') setP(prev => ({ ...prev, atk: prev.atk + 2 }));
-        if (puId === 'atk_rng') setP(prev => ({ ...prev, range: prev.range + 1 }));
-        setOfferedPowerUps([]);
-        setPendingPowerUp(null);
-      };
-
-      const nextFloor = useCallback(() => {
-        const nextF = floor + 1;
-        setFloor(nextF);
-        const regItem = inventory.find(i => i.id === 'hp_reg');
-        if (regItem) setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + Math.floor(prev.max * (0.05 * regItem.lvl))) }));
-        setMap(generateLevelMap(nextF));
-        setP(prev => ({ ...prev, x: 2, y: 2 }));
-        setOfferedPowerUps([...POWER_UPS_CATALOG].sort(() => 0.5 - Math.random()).slice(0, 3));
-      }, [floor, inventory]);
-
-      const processTurn = (currentLog, px, py) => {
-        const curX = px !== undefined ? px : p.x;
-        const curY = py !== undefined ? py : p.y;
-        let dmgRec = 0;
-        const res = inventory.find(i => i.id === 'def_res');
-        const rfl = inventory.find(i => i.id === 'def_rfl');
-
-        const newMap = map.map(row => row.map(cell => {
-          if (cell.e && !['player', 'fruit'].includes(cell.e.type)) {
-            let dx = curX - cell.x, dy = curY - cell.y;
-            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-              let d = Math.max(1, cell.e.dmg - (res ? res.lvl : 0));
-              dmgRec += d;
-              if (rfl) { cell.e.hp -= Math.floor(d * (0.2 * rfl.lvl)); if (cell.e.hp <= 0) return { ...cell, e: null }; }
-            } else if (Math.random() > 0.4) {
-              let sx = cell.x + (dx !== 0 ? dx / Math.abs(dx) : 0), sy = cell.y + (dy !== 0 ? dy / Math.abs(dy) : 0);
-              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === curX && sy === curY)) {
-                return { ...cell, e: null, pending: { ...cell.e, nx: sx, ny: sy } };
-              }
-            }
-          }
-          return { ...cell };
-        }));
-
-        newMap.forEach(r => r.forEach(c => { if (c.pending) { newMap[c.pending.ny][c.pending.nx].e = { ...c.pending }; delete c.pending; } }));
-        if (dmgRec > 0) currentLog.push(`💥 Dano: -${dmgRec}`);
-        setP(prev => ({ ...prev, hp: prev.hp - dmgRec }));
-        setMap(newMap);
-        setLog(prev => [...currentLog, ...prev].slice(0, 6));
+      const heal = () => {
+        if (inventory.length > 0 && p.hp < p.max) {
+          setInventory(prev => prev.slice(1));
+          setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + 15) }));
+          setLog(prev => ["🍎 Você usou uma maçã da mochila! (+15 HP)", ...prev]);
+        }
       };
 
       const move = (dx, dy) => {
-        if (p.hp <= 0 || p.sp > 0 || offeredPowerUps.length > 0 || pendingPowerUp) return;
+        if (!p || p.hp <= 0 || offeredPowers.length > 0) return;
         const nx = p.x + dx, ny = p.y + dy;
         const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
         
-        let targetEnemy = null;
+        // Ataque Distância
+        let target = null;
         for (let r = 1; r <= p.range; r++) {
           let tx = p.x + (dx * r), ty = p.y + (dy * r);
-          if (ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W) {
-            if (map[ty][tx].e && !['fruit', 'player'].includes(map[ty][tx].e.type)) {
-              targetEnemy = { x: tx, y: ty, data: map[ty][tx].e };
-              break;
-            }
-            if (map[ty][tx].t === 'wall') break;
+          if (mapData.map[ty]?.[tx]?.e && !['fruit', 'player'].includes(mapData.map[ty][tx].e.type)) {
+            target = { x: tx, y: ty, e: mapData.map[ty][tx].e }; break;
           }
+          if (mapData.map[ty]?.[tx]?.t === 'wall') break;
         }
 
-        if (targetEnemy) {
-          let currentLog = [`Ataque no ${targetEnemy.data.name}!`];
-          targetEnemy.data.hp -= p.atk;
-          const leach = inventory.find(i => i.id === 'atk_lch');
-          if (leach) setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + leach.lvl), f: nf }));
-          else setP(prev => ({ ...prev, f: nf }));
+        if (target) {
+          target.e.hp -= p.atk;
+          const leach = powers.find(i => i.id === 'atk_lch');
+          if (leach) setP(v => ({...v, hp: Math.min(v.max, v.hp + leach.lvl)}));
+          if (target.e.hp <= 0) {
+            let nXp = p.xp + target.e.xp, nLvl = p.lvl, nSp = p.sp;
+            if (nXp >= p.lvl * 20) { nXp = 0; nLvl++; nSp++; }
+            setP(v => ({ ...v, xp: nXp, lvl: nLvl, sp: nSp, f: nf }));
+            mapData.map[target.y][target.x].e = null;
+          } else { setP(v => ({...v, f: nf})); }
+          processTurn(); return;
+        }
 
-          if (targetEnemy.data.hp <= 0) {
-            map[targetEnemy.y][targetEnemy.x].e = null;
-            setP(prev => {
-              let nxp = prev.xp + targetEnemy.data.xp, nlvl = prev.lvl, nsp = prev.sp;
-              if (nxp >= prev.lvl * 15) { nxp -= prev.lvl * 15; nlvl++; nsp++; }
-              return { ...prev, xp: nxp, lvl: nlvl, sp: nsp };
-            });
-            currentLog.push("Inimigo abatido!");
-          }
-          processTurn(currentLog);
+        const cell = mapData.map[ny]?.[nx];
+        if (!cell || cell.t === 'wall') { setP(v => ({...v, f: nf})); return; }
+        if (cell.t === 'stairs') {
+          const nextF = floor + 1;
+          if (nextF > highScore) { setHighScore(nextF); localStorage.setItem('bw_high', nextF); }
+          setFloor(nextF);
+          setMapData(generateMap(nextF));
+          setP(v => ({ ...v, x: 2, y: 2 }));
+          setOfferedPowers([...POWER_UPS].sort(() => 0.5 - Math.random()).slice(0, 3));
           return;
         }
 
-        if (ny >= 0 && ny < MAP_H && nx >= 0 && nx < MAP_W) {
-          const target = map[ny][nx];
-          if (target.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
-          if (target.t === 'stairs') { nextFloor(); return; }
-          let currentLog = [];
-          if (target.e?.type === 'fruit') {
-            target.e = null;
-            currentLog.push("🍎 Maçã! (+10 HP)");
-            setP(prev => ({ ...prev, x: nx, y: ny, f: nf, hp: Math.min(prev.max, prev.hp + 10) }));
-          } else {
-            setP(prev => ({ ...prev, x: nx, y: ny, f: nf }));
-          }
-          processTurn(currentLog, nx, ny);
+        if (cell.e?.type === 'fruit') {
+          if (inventory.length < 3) { setInventory(v => [...v, 'apple']); setLog(v => ["🎒 Maçã guardada na mochila!", ...v]); }
+          else { setP(v => ({...v, hp: Math.min(v.max, v.hp + 10)})); setLog(v => ["🍎 Mochila cheia! Comeu na hora (+10 HP)", ...v]); }
+          cell.e = null;
         }
+        setP(v => ({ ...v, x: nx, y: ny, f: nf }));
+        processTurn(nx, ny);
+      };
+
+      const processTurn = (px = p.x, py = p.y) => {
+        let dmgRec = 0;
+        const defMod = powers.find(i => i.id === 'def_res')?.lvl || 0;
+        const newMap = mapData.map.map(row => row.map(c => {
+          if (c.e && !['fruit', 'player'].includes(c.e.type)) {
+            const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
+            if (dx <= 1 && dy <= 1) dmgRec += Math.max(1, c.e.dmg - (p.def + defMod));
+            else if (Math.random() > 0.5) {
+                const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
+                if (mapData.map[sy]?.[sx]?.t === 'floor' && !mapData.map[sy][sx].e) return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
+            }
+          }
+          return c;
+        }));
+        newMap.forEach(r => r.forEach(c => { if(c.next) { newMap[c.next.ny][c.next.nx].e = c.next; delete c.next; } }));
+        setMapData({ ...mapData, map: newMap });
+        setP(v => ({ ...v, hp: v.hp - dmgRec }));
       };
 
       useEffect(() => {
         const h = (e) => {
+          if (e.key === 'h' || e.key === 'H') heal();
           const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
-          if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
+          if (k[e.key]) move(...k[e.key]);
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
-      }, [p, map, inventory, offeredPowerUps, pendingPowerUp]);
+      }, [p, mapData]);
+
+      if (!charClass) return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6">
+          <h1 className="text-4xl font-black text-red-600 mb-2 italic">LOST IN BLACKWOOD</h1>
+          <p className="text-slate-500 mb-8 uppercase tracking-widest text-xs font-bold text-center">Melhor Andar Alcançado: {highScore}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
+            {CLASSES.map(c => (
+              <button key={c.id} onClick={() => selectClass(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-2xl hover:border-red-600 transition-all text-center group">
+                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
+                <h3 className="text-xl font-bold mb-2">{c.name}</h3>
+                <p className="text-xs text-slate-500 mb-4">{c.desc}</p>
+                <div className="text-[10px] space-y-1 text-slate-400">
+                  <p>HP: {c.stats.hp} | ATK: {c.stats.atk}</p>
+                  <p>Visão: {c.stats.vis} | Alcance: {c.stats.range}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
 
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-4 font-mono">
-          <header className="mb-4 text-center">
-            <h1 className="text-red-600 text-3xl font-black italic tracking-tighter uppercase">Lost in Blackwood</h1>
-            <div className="flex justify-center gap-2 mt-2">
-              {inventory.map(i => <div key={i.id} className={`lvl-${i.lvl} border-2 px-2 py-0.5 rounded text-[8px] font-bold bg-slate-900`}>{POWER_UPS_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <header className="flex justify-between w-full max-w-6xl mb-4 items-center">
+            <div><h1 className="text-red-600 font-black italic">BLACKWOOD</h1><p className="text-[10px] text-slate-500 uppercase tracking-widest">Andar {floor} {mapData.isFogLevel && "• NEVOEIRO"}</p></div>
+            <div className="flex gap-2">
+              {inventory.map((_, i) => <span key={i} className="text-xl">🍎</span>)}
+              {[...Array(3 - inventory.length)].map((_, i) => <span key={i} className="text-xl opacity-20">🍎</span>)}
             </div>
           </header>
 
-          <div className="flex flex-col xl:flex-row gap-6">
-            <div className="border-4 border-slate-900 bg-black p-1 rounded-2xl shadow-2xl">
-              {map.map((row, y) => (
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="bg-black border-4 border-slate-900 p-1 rounded-2xl shadow-2xl overflow-hidden">
+              {mapData.map.map((row, y) => (
                 <div key={y} className="flex">
                   {row.map((c, x) => {
-                    const vis = isVisible(x, y, p); if (vis) c.v = true;
-                    let ch = "⬛"; let op = "opacity-0";
-                    const isE = c.e && !['player', 'fruit'].includes(c.e.type);
-                    if (vis) { ch = p.x===x && p.y===y ? EMOJIS.player : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
-                    else if (c.v) { ch = EMOJIS[c.t]; op="opacity-10 grayscale"; }
+                    const vis = isVisible(x, y); if (vis) c.v = true;
+                    let char = "⬛"; let op = "opacity-0";
+                    if (vis) { char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
+                    else if (c.v) { char = EMOJIS[c.t]; op="opacity-10"; }
                     return (
-                      <div key={x} className={`relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-200 ${op}`}>
-                        {ch}
-                        {isE && vis && c.e.hp < c.e.maxHp && (
-                          <div className="absolute -top-1 left-1 right-1 h-1 bg-black rounded-full overflow-hidden border border-slate-900">
-                            <div className="h-full bg-red-600" style={{ width: `${(c.e.hp / c.e.maxHp) * 100}%` }}></div>
-                          </div>
-                        )}
+                      <div key={x} className={`relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl ${op}`}>
+                        {char}
+                        {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-6 h-1 bg-black rounded-full overflow-hidden border border-slate-800"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
                       </div>
                     );
                   })}
@@ -245,61 +224,55 @@
               ))}
             </div>
 
-            <div className="w-full xl:w-72 flex flex-col gap-4">
-              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg text-[10px] font-bold">
-                <div className="flex justify-between items-center mb-1 uppercase text-slate-400 font-bold tracking-tighter"><span>Andar {floor}</span></div>
-                <div className="flex justify-between items-center mb-1 text-red-500 italic uppercase"><span>Integridade</span><span>{p.hp}/{p.max}</span></div>
-                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-3"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
-                <div className="flex justify-between items-center mb-1 text-blue-500 italic uppercase"><span>Experiência</span><span>NV {p.lvl}</span></div>
-                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp / (p.lvl * 15)) * 100}%`}}></div></div>
+            <div className="w-full lg:w-72 flex flex-col gap-4">
+              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-xl font-bold text-[10px]">
+                <div className="flex justify-between mb-1"><span className="text-red-500 uppercase italic">Vitalidade</span><span>{p.hp}/{p.max}</span></div>
+                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-3"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
+                <div className="flex justify-between mb-1"><span className="text-blue-500 uppercase italic">XP LV {p.lvl}</span><span>{p.xp}/{p.lvl*20}</span></div>
+                <div className="w-full bg-black h-2 rounded-full overflow-hidden border border-slate-800 p-0.5"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*20))*100}%`}}></div></div>
               </div>
-
-              {/* MINI-MAPA RESTAURADO */}
-              <div className="bg-slate-900 p-3 rounded-xl border border-slate-800 shadow-inner">
-                <div className="bg-black p-1 rounded-lg flex justify-center border border-slate-800">
-                   <div className="grid" style={{ gridTemplateColumns: `repeat(${MAP_W}, 1fr)`, gap: '1px' }}>
-                    {map.map((row, y) => row.map((c, x) => {
-                        let bg = "bg-transparent";
-                        if (c.v) {
-                          if (x === p.x && y === p.y) bg = "bg-emerald-400 shadow-[0_0_4px_#34d399]";
-                          else if (c.e && isVisible(x,y,p)) bg = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
-                          else if (c.t === 'stairs') bg = "bg-amber-400 animate-pulse";
-                          else if (c.t === 'wall') bg = "bg-slate-800";
-                          else bg = "bg-slate-900";
-                        }
-                        return <div key={`${x}-${y}`} className={`minimap-pixel ${bg}`}></div>;
-                    }))}
-                   </div>
+              <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 flex justify-center shadow-inner">
+                <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
+                  {mapData.map.map((row, y) => row.map((c, x) => {
+                    let col = "bg-transparent";
+                    if (c.v) {
+                      if (p.x===x && p.y===y) col = "bg-emerald-400 shadow-[0_0_4px_#34d399]";
+                      else if (c.e && isVisible(x,y)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
+                      else if (c.t==='stairs') col = "bg-amber-400";
+                      else if (c.t==='wall') col = "bg-slate-800";
+                      else col = "bg-slate-900";
+                    }
+                    return <div key={`${x}-${y}`} className={`minimap-pixel ${col}`}></div>;
+                  }))}
                 </div>
-              </div>
-
-              <div className="bg-black/60 p-3 rounded-xl border border-slate-800 h-24 overflow-hidden text-[10px] italic">
-                {log.map((m, i) => <div key={i} className={i===0?"text-red-400 font-bold":"text-slate-500"}>{m}</div>)}
               </div>
             </div>
           </div>
 
-          {offeredPowerUps.length > 0 && (
+          {offeredPowers.length > 0 && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
               <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-2xl w-full">
-                <h2 className="text-xl text-emerald-500 font-black mb-1 uppercase italic tracking-widest">Dádiva da Floresta</h2>
+                <h2 className="text-xl text-emerald-500 font-black mb-1 uppercase italic tracking-widest">Aprimoramento</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  {offeredPowerUps.map(pu => {
-                    const inv = inventory.find(i => i.id === pu.id);
-                    return <button key={pu.id} onClick={() => applyPowerUp(pu.id)} className={`bg-slate-950 border-2 p-4 rounded-2xl transition-all hover:scale-105 lvl-${(inv?.lvl||0)+1}`}><div className="text-3xl mb-1">{pu.icon}</div><div className="font-bold text-xs uppercase">{pu.name}</div><div className="text-[8px] text-slate-500 mt-2">{pu.desc}</div><div className="text-[8px] font-black mt-2 uppercase">Nível {(inv?.lvl||0)+1}</div></button>;
+                  {offeredPowers.map(pu => {
+                    const inv = powers.find(i => i.id === pu.id);
+                    return <button key={pu.id} onClick={() => {
+                        setPowers(prev => {
+                          const item = prev.find(i => i.id === pu.id);
+                          if (item) return prev.map(i => i.id === pu.id ? { ...i, lvl: Math.min(5, i.lvl + 1) } : i);
+                          return [...prev, { id: puId, lvl: 1 }];
+                        });
+                        if (pu.id === 'atk_dmg') setP(v => ({...v, atk: v.atk+2}));
+                        if (pu.id === 'atk_rng') setP(v => ({...v, range: v.range+1}));
+                        setOfferedPowers([]);
+                    }} className="bg-slate-950 border-2 border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center"><div className="text-3xl mb-1">{pu.icon}</div><div className="text-xs font-bold">{pu.name}</div><div className="text-[9px] text-slate-500 uppercase">{pu.desc}</div></button>;
                   })}
                 </div>
               </div>
             </div>
           )}
 
-          {p.sp > 0 && offeredPowerUps.length === 0 && (
-            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
-              <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-2xl text-center max-w-xs w-full"><h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2><button onClick={()=>setP(prev=>({...prev, max:prev.max+10, hp:prev.hp+10, sp:prev.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-xl hover:bg-red-600 font-bold uppercase text-xs">Aumentar HP (+10)</button><button onClick={()=>setP(prev=>({...prev, atk:prev.atk+3, sp:prev.sp-1}))} className="w-full bg-slate-800 border border-slate-600 text-slate-300 py-4 rounded-xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aumentar Dano (+3)</button></div>
-            </div>
-          )}
-
-          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6"><h2 className="text-7xl text-red-800 font-black mb-2 uppercase italic tracking-tighter">Morte</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full uppercase tracking-widest border-2 border-red-600">Reiniciar</button></div>}
+          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center"><h2 className="text-6xl text-red-800 font-black mb-2 italic">VOCÊ CAIU</h2><p className="text-slate-500 mb-8 italic">Seu recorde foi o andar {highScore}</p><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600">REINICIAR</button></div>}
         </div>
       );
     }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Stable Build</title>
+  <title>Lost in Blackwood - Pathfinding Fix</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -51,18 +51,22 @@
     const generateMap = (floor) => {
       let map = [];
       const isFog = Math.random() < 0.2 && floor > 1;
+      const startX = 2, startY = 2, endX = MAP_W - 2, endY = MAP_H - 2;
+
       for (let y = 0; y < MAP_H; y++) {
         let row = [];
         for (let x = 0; x < MAP_W; x++) {
           const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
-          row.push({ x, y, t: isBorder || (Math.random() < 0.16 && x > 4) ? 'wall' : 'floor', e: null, v: false });
+          // Lógica de túnel: não cria paredes no caminho direto para a escada
+          const isInTunnel = (y === startY && x <= endX) || (x === endX && y >= startY);
+          const isWall = isBorder || (Math.random() < 0.18 && x > 4 && !isInTunnel);
+          row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
         }
         map.push(row);
       }
-      // Frutas
+
       map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' }; }));
       
-      // Inimigos
       for (let i = 0; i < 6 + floor; i++) {
         let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
         if (map[ry][rx].t === 'floor' && !map[ry][rx].e && rx > 5) {
@@ -71,13 +75,13 @@
         }
       }
 
-      // Boss
       if (Math.random() < 0.25) {
         let bx = 18, by = 10;
         map[by][bx].e = { type: 'boss', hp: 60+(floor*30), maxHp: 60+(floor*30), dmg: 6+floor, xp: 100, name: 'GUARDIÃO' };
       }
 
-      map[MAP_H-2][MAP_W-2].t = 'stairs';
+      map[endY][endX].t = 'stairs';
+      map[endY][endX].e = null;
       return { map, isFog };
     };
 
@@ -94,10 +98,9 @@
 
       const start = (c) => {
         setCharClass(c);
-        const playerStats = { ...c.stats, max: c.stats.hp, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' };
-        setP(playerStats);
+        setP({ ...c.stats, max: c.stats.hp, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' });
         setMapData(generateMap(1));
-        setLog(["Fuja de Blackwood. Pressione H para usar maçãs."]);
+        setLog(["Fuja de Blackwood."]);
       };
 
       const isVisible = (x, y) => {
@@ -124,7 +127,6 @@
         const nx = p.x + dx, ny = p.y + dy;
         const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
 
-        // Ataque
         let target = null;
         for (let r = 1; r <= p.range; r++) {
           let tx = p.x + (dx * r), ty = p.y + (dy * r);
@@ -144,7 +146,6 @@
             if (nXp >= p.lvl * 30) { nXp = 0; nLvl++; nSp++; }
             setP(v => ({...v, xp: nXp, lvl: nLvl, sp: nSp, f: nf}));
             mapData.map[target.y][target.x].e = null;
-            setLog(v => [`Abateu ${target.e.name}!`, ...v]);
           } else { setP(v => ({...v, f: nf})); }
           processAI(p.x, p.y); return;
         }
@@ -152,8 +153,7 @@
         const cell = mapData.map[ny]?.[nx];
         if (!cell || cell.t === 'wall') { setP(v => ({...v, f: nf})); return; }
         if (cell.t === 'stairs') {
-          const nFloor = floor + 1;
-          setFloor(nFloor);
+          const nFloor = floor + 1; setFloor(nFloor);
           if (nFloor > highScore) { setHighScore(nFloor); localStorage.setItem('bw_high', nFloor); }
           setMapData(generateMap(nFloor));
           setP(v => ({...v, x: 2, y: 2}));
@@ -192,22 +192,20 @@
 
       useEffect(() => {
         const h = (e) => {
-          if (e.key.toLowerCase() === 'h' && p) {
-            if (inventory.length > 0 && p.hp < p.max) {
+          if (e.key.toLowerCase() === 'h' && p && inventory.length > 0 && p.hp < p.max) {
               setInventory(v => v.slice(1));
               setP(v => ({...v, hp: Math.min(v.max, v.hp + 15)}));
-            }
           }
           const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
           if (k[e.key]) move(...k[e.key]);
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
-      }, [p, mapData, offered]);
+      }, [p, mapData, offered, inventory]);
 
       if (!charClass) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6">
-          <h1 className="text-4xl font-black text-red-600 mb-2 italic tracking-tighter">LOST IN BLACKWOOD</h1>
+          <h1 className="text-4xl font-black text-red-600 mb-2 italic tracking-tighter uppercase">Lost in Blackwood</h1>
           <p className="text-slate-500 mb-10 text-xs uppercase tracking-[0.4em]">Recorde: Andar {highScore}</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
             {CLASSES.map(c => (
@@ -215,10 +213,6 @@
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
                 <h3 className="text-xl font-bold text-white mb-2 uppercase">{c.name}</h3>
                 <p className="text-[10px] text-slate-500 mb-4">{c.desc}</p>
-                <div className="text-[9px] text-slate-400 space-y-1 bg-black/40 p-3 rounded-xl">
-                  <p>HP: {c.stats.hp} | ATK: {c.stats.atk}</p>
-                  <p>VISÃO: {c.stats.vis} | ALCANCE: {c.stats.range}</p>
-                </div>
               </button>
             ))}
           </div>
@@ -227,14 +221,6 @@
 
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <header className="flex justify-between w-full max-w-6xl mb-4 items-end">
-            <div><h1 className="text-red-600 font-black italic text-2xl tracking-tighter">LOST IN BLACKWOOD</h1><p className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.3em]">Andar {floor} {mapData.isFog && "• NEVOEIRO"}</p></div>
-            <div className="flex gap-1 bg-slate-900 p-2 rounded-xl border border-slate-800">
-              {inventory.map((_, i) => <span key={i} className="text-lg">🍎</span>)}
-              {[...Array(3 - inventory.length)].map((_, i) => <span key={i} className="text-lg opacity-10">🍎</span>)}
-            </div>
-          </header>
-
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="bg-black border-4 border-slate-900 p-1 rounded-2xl shadow-2xl overflow-hidden">
               {mapData.map.map((row, y) => (
@@ -257,20 +243,28 @@
 
             <div className="w-full lg:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
-                <div className="flex justify-between mb-1 text-red-500 italic uppercase"><span>Vida</span><span>{p.hp}/{p.max}</span></div>
-                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-3"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
+                <div className="flex justify-between mb-1 text-red-500 uppercase italic"><span>Vida</span><span>{p.hp}/{p.max}</span></div>
+                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
+                
+                <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 text-center">
+                   <p className="text-emerald-400 mb-2 uppercase tracking-widest text-[8px]">Mochila (Maçãs: {inventory.length})</p>
+                   <div className="flex justify-center gap-2 mb-2">
+                    {inventory.map((_, i) => <span key={i}>🍎</span>)}
+                    {inventory.length === 0 && <span className="opacity-20 italic">Vazia</span>}
+                   </div>
+                   <p className="text-white text-[9px] animate-pulse">Pressione [H] para curar</p>
+                </div>
+
                 <div className="flex justify-between mb-1 text-blue-500 italic uppercase"><span>XP NV {p.lvl}</span><span>{p.xp}/{p.lvl*30}</span></div>
                 <div className="w-full bg-black h-2 rounded-full overflow-hidden border border-slate-800 p-0.5"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*30))*100}%`}}></div></div>
-                <div className="flex gap-2 mt-4">
-                   {powers.map(i => <div key={i.id} className={`lvl-border lvl-${i.lvl} p-1 rounded text-[8px] bg-black/40`}>{POWER_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
-                </div>
               </div>
+
               <div className="bg-slate-900 p-2 rounded-2xl border border-slate-800 flex justify-center shadow-inner">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
                   {mapData.map.map((row, y) => row.map((c, x) => {
                     let col = "bg-transparent";
                     if (c.v) {
-                      if (p.x===x && p.y===y) col = "bg-emerald-400 shadow-[0_0_4px_#34d399]";
+                      if (p.x===x && p.y===y) col = "bg-emerald-400";
                       else if (c.e && isVisible(x,y)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
                       else if (c.t==='stairs') col = "bg-amber-400";
                       else if (c.t==='wall') col = "bg-slate-800";
@@ -279,9 +273,6 @@
                     return <div key={`${x}-${y}`} className={`minimap-pixel ${col}`}></div>;
                   }))}
                 </div>
-              </div>
-              <div className="bg-black/40 p-3 rounded-xl border border-slate-800 h-24 overflow-hidden text-[9px] text-slate-500 italic">
-                {log.slice(0, 5).map((m, i) => <div key={i}>{i === 0 ? "» " : ""}{m}</div>)}
               </div>
             </div>
           </div>
@@ -293,12 +284,7 @@
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   {offered.map(pu => {
                     const inv = powers.find(i => i.id === pu.id);
-                    return <button key={pu.id} onClick={() => selectPower(pu.id)} className={`bg-slate-950 border-2 border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center group`}>
-                      <div className="text-3xl mb-1 group-hover:scale-110 transition-transform">{pu.icon}</div>
-                      <div className="text-xs font-bold text-white uppercase">{pu.name}</div>
-                      <div className="text-[8px] text-slate-500 mt-2 uppercase">{pu.desc}</div>
-                      <div className="text-[8px] text-amber-500 font-bold mt-2">NÍVEL {(inv?.lvl||0)+1}</div>
-                    </button>;
+                    return <button key={pu.id} onClick={() => selectPower(pu.id)} className={`bg-slate-950 border-2 border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center group`}><div className="text-3xl mb-1 group-hover:scale-110 transition-transform">{pu.icon}</div><div className="text-xs font-bold text-white uppercase">{pu.name}</div><div className="text-[8px] text-slate-500 mt-2 uppercase">{pu.desc}</div><div className="text-[8px] text-amber-500 font-bold mt-2">NÍVEL {(inv?.lvl||0)+1}</div></button>;
                   })}
                 </div>
               </div>
@@ -308,14 +294,14 @@
           {p.sp > 0 && offered.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
               <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic tracking-tighter text-center">Instinto</h2>
-                <button onClick={()=>setP(v=>({...v, max:v.max+10, hp:v.hp+10, sp:v.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs transition-all">Vitalidade (+10 HP)</button>
-                <button onClick={()=>setP(v=>({...v, atk:v.atk+3, sp:v.sp-1}))} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs transition-all">Força (+3 Dano)</button>
+                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Instinto</h2>
+                <button onClick={()=>setP(v=>({...v, max:v.max+10, hp:v.hp+10, sp:v.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs">Vitalidade (+10 HP)</button>
+                <button onClick={()=>setP(v=>({...v, atk:v.atk+3, sp:v.sp-1}))} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Força (+3 Dano)</button>
               </div>
             </div>
           )}
 
-          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center animate-in fade-in duration-1000"><h2 className="text-6xl text-red-800 font-black mb-2 italic tracking-tighter">VOCÊ CAIU</h2><p className="text-slate-500 mb-8 italic">A floresta consumiu sua jornada no andar {floor}.</p><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600 shadow-[0_0_20px_rgba(220,38,38,0.5)]">REINICIAR</button></div>}
+          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center"><h2 className="text-7xl text-red-800 font-black mb-2 italic tracking-tighter uppercase">Fim da Linha</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600">REINICIAR</button></div>}
         </div>
       );
     }

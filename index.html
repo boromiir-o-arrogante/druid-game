@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Pathfinding Fix</title>
+  <title>Lost in Blackwood - Final Polish</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -12,10 +12,9 @@
     body { margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
     .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.5s ease; }
     .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.5s ease; }
-    .minimap-pixel { width: 6px; height: 6px; border-radius: 1px; }
-    .lvl-border { border-width: 2px; border-style: solid; }
-    @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.2); background-color: #d8b4fe; } }
-    .animate-boss-radar { animation: pulse-purple 0.8s infinite; }
+    .minimap-bg { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 6px; box-shadow: inset 0 0 10px #000; }
+    @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.3); background-color: #e879f9; } }
+    .animate-boss-radar { animation: pulse-purple 0.8s infinite; border-radius: 50%; }
   </style>
 </head>
 <body class="select-none">
@@ -26,144 +25,117 @@
     const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", stairs: "🪜", fruit: "🍎", boss: "👿" };
     
     const CLASSES = [
-      { id: 'exp', name: 'Explorador', icon: '👦', desc: 'Mais visão e alcance.', stats: { hp: 35, atk: 5, range: 2, vis: 7, def: 0 } },
-      { id: 'war', name: 'Guerreiro', icon: '🛡️', desc: 'Tanque com muita vida.', stats: { hp: 55, atk: 6, range: 1, vis: 5, def: 1 } },
-      { id: 'hun', name: 'Caçador', icon: '🏹', desc: 'Alto dano, pouca vida.', stats: { hp: 25, atk: 9, range: 1, vis: 5, def: 0 } }
+      { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 40, atk: 5, range: 2, vis: 8, def: 0 } },
+      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 60, atk: 6, range: 1, vis: 5, def: 2 } },
+      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 30, atk: 10, range: 1, vis: 6, def: 0 } }
     ];
 
     const POWER_CATALOG = [
-      { id: 'atk_dmg', name: 'Força', icon: '⚔️', desc: '+2 Dano' },
+      { id: 'atk_dmg', name: 'Força', icon: '⚔️', desc: '+3 Dano' },
       { id: 'atk_rng', name: 'Alcance', icon: '🏹', desc: '+1 Alcance' },
-      { id: 'atk_lch', name: 'Drenar', icon: '🩸', desc: 'Cura no Atq' },
-      { id: 'def_res', name: 'Couraça', icon: '🛡️', desc: '-1 Dano Rec.' },
-      { id: 'def_rfl', name: 'Espinhos', icon: '✨', desc: 'Reflete Dano' },
-      { id: 'hp_reg', name: 'Regen', icon: '❤️', desc: 'Cura por Andar' }
+      { id: 'def_res', name: 'Couraça', icon: '🛡️', desc: '-1 Dano Rec.' }
     ];
 
     const MAP_W = 24; const MAP_H = 14; 
-    const ENEMY_BASE = [
-      { type: 'bat', hp: 5, xp: 5, dmg: 2, name: 'Morcego' },
-      { type: 'slime', hp: 8, xp: 7, dmg: 3, name: 'Slime' },
-      { type: 'goblin', hp: 15, xp: 12, dmg: 4, name: 'Goblin' },
-      { type: 'orc', hp: 25, xp: 20, dmg: 6, name: 'Orc' }
-    ];
+    const ENEMY_BASE = [{ type: 'bat', hp: 5, xp: 5, dmg: 2, name: 'Morcego' }, { type: 'slime', hp: 8, xp: 7, dmg: 3, name: 'Slime' }, { type: 'goblin', hp: 15, xp: 12, dmg: 4, name: 'Goblin' }];
 
     const generateMap = (floor) => {
       let map = [];
-      const isFog = Math.random() < 0.2 && floor > 1;
-      const startX = 2, startY = 2, endX = MAP_W - 2, endY = MAP_H - 2;
-
       for (let y = 0; y < MAP_H; y++) {
         let row = [];
         for (let x = 0; x < MAP_W; x++) {
           const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
-          // Lógica de túnel: não cria paredes no caminho direto para a escada
-          const isInTunnel = (y === startY && x <= endX) || (x === endX && y >= startY);
-          const isWall = isBorder || (Math.random() < 0.18 && x > 4 && !isInTunnel);
+          const isInTunnel = (y === 2 && x <= 22) || (x === 22 && y >= 2);
+          const isWall = isBorder || (Math.random() < 0.15 && !isInTunnel && x > 4);
           row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
         }
         map.push(row);
       }
-
-      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' }; }));
-      
-      for (let i = 0; i < 6 + floor; i++) {
-        let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
-        if (map[ry][rx].t === 'floor' && !map[ry][rx].e && rx > 5) {
-          const base = ENEMY_BASE[Math.floor(Math.random() * Math.min(floor, 4))];
-          map[ry][rx].e = { ...base, hp: base.hp + (floor*2), maxHp: base.hp + (floor*2), dmg: base.dmg + Math.floor(floor/2) };
+      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.05) c.e = { type: 'fruit' }; }));
+      for (let i = 0; i < 5 + floor; i++) {
+        let rx = Math.floor(Math.random() * 20) + 3, ry = Math.floor(Math.random() * 10) + 2;
+        if (map[ry][rx].t === 'floor' && !map[ry][rx].e) {
+          const base = ENEMY_BASE[Math.floor(Math.random() * ENEMY_BASE.length)];
+          map[ry][rx].e = { ...base, hp: base.hp + floor, maxHp: base.hp + floor, dmg: base.dmg + Math.floor(floor/3) };
         }
       }
-
-      if (Math.random() < 0.25) {
-        let bx = 18, by = 10;
-        map[by][bx].e = { type: 'boss', hp: 60+(floor*30), maxHp: 60+(floor*30), dmg: 6+floor, xp: 100, name: 'GUARDIÃO' };
+      if (Math.random() < 0.3) {
+        map[10][18].e = { type: 'boss', hp: 40+(floor*15), maxHp: 40+(floor*15), dmg: 5+Math.floor(floor/2), xp: 80, name: 'GUARDIÃO' };
       }
-
-      map[endY][endX].t = 'stairs';
-      map[endY][endX].e = null;
-      return { map, isFog };
+      map[12][22].t = 'stairs';
+      return map;
     };
 
     function App() {
       const [charClass, setCharClass] = useState(null);
       const [floor, setFloor] = useState(1);
       const [p, setP] = useState(null);
-      const [mapData, setMapData] = useState({ map: [], isFog: false });
+      const [map, setMap] = useState([]);
       const [inventory, setInventory] = useState([]);
-      const [powers, setPowers] = useState([]);
       const [offered, setOffered] = useState([]);
-      const [log, setLog] = useState([]);
-      const [highScore, setHighScore] = useState(localStorage.getItem('bw_high') || 1);
+      const [highScore] = useState(localStorage.getItem('bw_high') || 1);
+      const [turnCounter, setTurnCounter] = useState(0);
 
       const start = (c) => {
         setCharClass(c);
         setP({ ...c.stats, max: c.stats.hp, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' });
-        setMapData(generateMap(1));
-        setLog(["Fuja de Blackwood."]);
+        setMap(generateMap(1));
       };
 
-      const isVisible = (x, y) => {
-        if (!p) return false;
-        const dx = Math.abs(x - p.x), dy = Math.abs(y - p.y);
-        const r = mapData.isFog ? 2 : p.vis;
-        return (dx <= 1 && dy <= 1) || (dx <= r && dy <= r);
-      };
-
-      const selectPower = (id) => {
-        setPowers(prev => {
-          const exists = prev.find(i => i.id === id);
-          if (exists) return prev.map(i => i.id === id ? { ...i, lvl: Math.min(5, i.lvl + 1) } : i);
-          return [...prev, { id, lvl: 1 }];
-        });
-        if (id === 'atk_dmg') setP(v => ({...v, atk: v.atk + 2}));
-        if (id === 'atk_rng') setP(v => ({...v, range: v.range + 1}));
-        if (id === 'hp_reg') setP(v => ({...v, max: v.max + 10, hp: v.hp + 10}));
-        setOffered([]);
+      const isVisible = (x, y, player) => {
+        const dx = x - player.x, dy = y - player.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 1.5) return true;
+        if (dist > player.vis) return false;
+        const angle = Math.atan2(dy, dx);
+        let targetAngle = 0;
+        if (player.f === 'UP') targetAngle = -Math.PI/2;
+        if (player.f === 'DOWN') targetAngle = Math.PI/2;
+        if (player.f === 'LEFT') targetAngle = Math.PI;
+        if (player.f === 'RIGHT') targetAngle = 0;
+        let diff = Math.abs(angle - targetAngle);
+        if (diff > Math.PI) diff = 2*Math.PI - diff;
+        return diff < 0.8; // Cone de ~90 graus
       };
 
       const move = (dx, dy) => {
         if (!p || p.hp <= 0 || offered.length > 0) return;
         const nx = p.x + dx, ny = p.y + dy;
         const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
-
+        
         let target = null;
         for (let r = 1; r <= p.range; r++) {
           let tx = p.x + (dx * r), ty = p.y + (dy * r);
-          const cellE = mapData.map[ty]?.[tx]?.e;
-          if (cellE && !['fruit', 'player'].includes(cellE.type)) {
-            target = { x: tx, y: ty, e: cellE }; break;
+          if (map[ty]?.[tx]?.e && !['fruit', 'player'].includes(map[ty][tx].e.type)) {
+            target = { x: tx, y: ty, e: map[ty][tx].e }; break;
           }
-          if (mapData.map[ty]?.[tx]?.t === 'wall') break;
+          if (map[ty]?.[tx]?.t === 'wall') break;
         }
 
         if (target) {
           target.e.hp -= p.atk;
-          const leach = powers.find(i => i.id === 'atk_lch');
-          if (leach) setP(v => ({...v, hp: Math.min(v.max, v.hp + leach.lvl)}));
           if (target.e.hp <= 0) {
-            let nXp = p.xp + target.e.xp, nLvl = p.lvl, nSp = p.sp;
-            if (nXp >= p.lvl * 30) { nXp = 0; nLvl++; nSp++; }
+            let nXp = p.xp + target.e.xp;
+            let nLvl = p.lvl, nSp = p.sp;
+            if (nXp >= p.lvl * 25) { nXp = 0; nLvl++; nSp++; }
             setP(v => ({...v, xp: nXp, lvl: nLvl, sp: nSp, f: nf}));
-            mapData.map[target.y][target.x].e = null;
+            map[target.y][target.x].e = null;
           } else { setP(v => ({...v, f: nf})); }
           processAI(p.x, p.y); return;
         }
 
-        const cell = mapData.map[ny]?.[nx];
+        const cell = map[ny]?.[nx];
         if (!cell || cell.t === 'wall') { setP(v => ({...v, f: nf})); return; }
         if (cell.t === 'stairs') {
-          const nFloor = floor + 1; setFloor(nFloor);
-          if (nFloor > highScore) { setHighScore(nFloor); localStorage.setItem('bw_high', nFloor); }
-          setMapData(generateMap(nFloor));
-          setP(v => ({...v, x: 2, y: 2}));
-          setOffered([...POWER_CATALOG].sort(() => 0.5 - Math.random()).slice(0, 3));
-          return;
+          const nextF = floor + 1; setFloor(nextF);
+          if (nextF > highScore) localStorage.setItem('bw_high', nextF);
+          setMap(generateMap(nextF)); setP(v => ({...v, x: 2, y: 2}));
+          setOffered([...POWER_CATALOG].sort(() => 0.5 - Math.random())); return;
         }
 
         if (cell.e?.type === 'fruit') {
           if (inventory.length < 3) setInventory(v => [...v, 'apple']);
-          else setP(v => ({...v, hp: Math.min(v.max, v.hp + 10)}));
+          else setP(v => ({...v, hp: Math.min(v.max, v.hp + 12)}));
           cell.e = null;
         }
         setP(v => ({...v, x: nx, y: ny, f: nf}));
@@ -172,47 +144,50 @@
 
       const processAI = (px, py) => {
         let dmg = 0;
-        const defP = p.def + (powers.find(i => i.id === 'def_res')?.lvl || 0);
-        const newMap = mapData.map.map(row => row.map(c => {
+        setTurnCounter(t => t + 1);
+        const newMap = map.map(row => row.map(c => {
           if (c.e && !['fruit', 'player'].includes(c.e.type)) {
+            const isBoss = c.e.type === 'boss';
             const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
-            if (dx <= 1 && dy <= 1) dmg += Math.max(1, c.e.dmg - defP);
-            else if (Math.random() > 0.4) {
-              const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
-              if (mapData.map[sy]?.[sx]?.t === 'floor' && !mapData.map[sy][sx].e && !(sx === px && sy === py)) 
+            if (dx <= 1 && dy <= 1) {
+              dmg += Math.max(1, c.e.dmg - p.def);
+            } else if (Math.random() > 0.4) {
+              // Boss só move a cada 2 turnos para ser justo
+              if (isBoss && turnCounter % 2 !== 0) return c;
+              const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0);
+              const sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
+              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) 
                 return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
             }
           }
           return c;
         }));
         newMap.forEach(r => r.forEach(c => { if(c.next) { newMap[c.next.ny][c.next.nx].e = c.next; delete c.next; } }));
-        setMapData(prev => ({ ...prev, map: newMap }));
-        setP(v => ({ ...v, hp: v.hp - dmg }));
+        setMap(newMap); setP(v => ({ ...v, hp: v.hp - dmg }));
       };
 
       useEffect(() => {
         const h = (e) => {
-          if (e.key.toLowerCase() === 'h' && p && inventory.length > 0 && p.hp < p.max) {
-              setInventory(v => v.slice(1));
-              setP(v => ({...v, hp: Math.min(v.max, v.hp + 15)}));
+          if (e.key.toLowerCase() === 'h' && p && inventory.length > 0) {
+            setInventory(v => v.slice(1)); setP(v => ({...v, hp: Math.min(v.max, v.hp + 20)}));
           }
           const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
           if (k[e.key]) move(...k[e.key]);
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
-      }, [p, mapData, offered, inventory]);
+      }, [p, map, inventory, offered]);
 
       if (!charClass) return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6">
-          <h1 className="text-4xl font-black text-red-600 mb-2 italic tracking-tighter uppercase">Lost in Blackwood</h1>
-          <p className="text-slate-500 mb-10 text-xs uppercase tracking-[0.4em]">Recorde: Andar {highScore}</p>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 text-center">
+          <h1 className="text-4xl font-black text-red-600 mb-2 italic">LOST IN BLACKWOOD</h1>
+          <p className="text-slate-500 mb-10 text-xs uppercase tracking-widest">Sobreviva ao Cone de Visão</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
             {CLASSES.map(c => (
-              <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all text-center group">
-                <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
-                <h3 className="text-xl font-bold text-white mb-2 uppercase">{c.name}</h3>
-                <p className="text-[10px] text-slate-500 mb-4">{c.desc}</p>
+              <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all">
+                <div className="text-5xl mb-4">{c.icon}</div>
+                <h3 className="text-xl font-bold mb-2 uppercase">{c.name}</h3>
+                <div className="text-[10px] text-slate-400">HP: {c.stats.hp} | ATK: {c.stats.atk}</div>
               </button>
             ))}
           </div>
@@ -223,17 +198,17 @@
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
           <div className="flex flex-col lg:flex-row gap-6">
             <div className="bg-black border-4 border-slate-900 p-1 rounded-2xl shadow-2xl overflow-hidden">
-              {mapData.map.map((row, y) => (
+              {map.map((row, y) => (
                 <div key={y} className="flex">
                   {row.map((c, x) => {
-                    const vis = isVisible(x, y); if (vis) c.v = true;
+                    const vis = isVisible(x, y, p); if (vis) c.v = true;
                     let char = "⬛"; let op = "opacity-0";
                     if (vis) { char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
-                    else if (c.v) { char = EMOJIS[c.t]; op="opacity-10 grayscale"; }
+                    else if (c.v) { char = EMOJIS[c.t]; op="opacity-10"; }
                     return (
-                      <div key={x} className={`relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl ${op}`}>
-                        {char}
-                        {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-6 h-1 bg-black rounded-full overflow-hidden border border-slate-900"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
+                      <div key={x} className="relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-all">
+                        <div className={op}>{char}</div>
+                        {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-6 h-1 bg-black rounded-full overflow-hidden"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
                       </div>
                     );
                   })}
@@ -243,34 +218,29 @@
 
             <div className="w-full lg:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
-                <div className="flex justify-between mb-1 text-red-500 uppercase italic"><span>Vida</span><span>{p.hp}/{p.max}</span></div>
-                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
-                
-                <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700 mb-4 text-center">
-                   <p className="text-emerald-400 mb-2 uppercase tracking-widest text-[8px]">Mochila (Maçãs: {inventory.length})</p>
-                   <div className="flex justify-center gap-2 mb-2">
-                    {inventory.map((_, i) => <span key={i}>🍎</span>)}
-                    {inventory.length === 0 && <span className="opacity-20 italic">Vazia</span>}
-                   </div>
-                   <p className="text-white text-[9px] animate-pulse">Pressione [H] para curar</p>
+                <div className="flex justify-between text-red-500 uppercase mb-1"><span>Vida</span><span>{p.hp}/{p.max}</span></div>
+                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
+                <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-center mb-4">
+                   <p className="text-emerald-400 mb-1 text-[8px] uppercase">Mochila: {inventory.length}/3</p>
+                   <div className="flex justify-center gap-1 mb-1">{inventory.map((_,i)=><span key={i}>🍎</span>)}</div>
+                   <p className="text-white text-[8px]">PRESS [H] PARA CURAR</p>
                 </div>
-
-                <div className="flex justify-between mb-1 text-blue-500 italic uppercase"><span>XP NV {p.lvl}</span><span>{p.xp}/{p.lvl*30}</span></div>
-                <div className="w-full bg-black h-2 rounded-full overflow-hidden border border-slate-800 p-0.5"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*30))*100}%`}}></div></div>
+                <div className="flex justify-between text-blue-500 uppercase mb-1"><span>XP NV {p.lvl}</span><span>{p.xp}/{p.lvl*25}</span></div>
+                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*25))*100}%`}}></div></div>
               </div>
 
-              <div className="bg-slate-900 p-2 rounded-2xl border border-slate-800 flex justify-center shadow-inner">
+              <div className="minimap-bg flex justify-center">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
-                  {mapData.map.map((row, y) => row.map((c, x) => {
+                  {map.map((row, y) => row.map((c, x) => {
                     let col = "bg-transparent";
                     if (c.v) {
-                      if (p.x===x && p.y===y) col = "bg-emerald-400";
-                      else if (c.e && isVisible(x,y)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
-                      else if (c.t==='stairs') col = "bg-amber-400";
-                      else if (c.t==='wall') col = "bg-slate-800";
-                      else col = "bg-slate-900";
+                      if (p.x===x && p.y===y) col = "bg-emerald-400 shadow-[0_0_5px_#34d399]";
+                      else if (c.e && isVisible(x,y,p)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-500";
+                      else if (c.t==='stairs') col = "bg-yellow-400";
+                      else if (c.t==='wall') col = "bg-slate-700";
+                      else col = "bg-slate-800";
                     }
-                    return <div key={`${x}-${y}`} className={`minimap-pixel ${col}`}></div>;
+                    return <div key={`${x}-${y}`} className="w-[6px] h-[6px] rounded-[1px] transition-colors" style={{backgroundColor: col.startsWith('bg-') ? undefined : col}} className={col.startsWith('bg-') ? `w-[6px] h-[6px] ${col}` : ''}></div>;
                   }))}
                 </div>
               </div>
@@ -279,29 +249,18 @@
 
           {offered.length > 0 && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
-              <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-2xl w-full">
-                <h2 className="text-xl text-emerald-500 font-black mb-1 uppercase italic tracking-widest">Dádiva da Floresta</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                  {offered.map(pu => {
-                    const inv = powers.find(i => i.id === pu.id);
-                    return <button key={pu.id} onClick={() => selectPower(pu.id)} className={`bg-slate-950 border-2 border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center group`}><div className="text-3xl mb-1 group-hover:scale-110 transition-transform">{pu.icon}</div><div className="text-xs font-bold text-white uppercase">{pu.name}</div><div className="text-[8px] text-slate-500 mt-2 uppercase">{pu.desc}</div><div className="text-[8px] text-amber-500 font-bold mt-2">NÍVEL {(inv?.lvl||0)+1}</div></button>;
-                  })}
+              <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-xl w-full">
+                <h2 className="text-xl text-emerald-500 font-black mb-6 uppercase italic">Dádiva do Andar {floor}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {offered.map(pu => <button key={pu.id} onClick={()=>{
+                    if(pu.id==='atk_dmg')setP(v=>({...v,atk:v.atk+3})); if(pu.id==='atk_rng')setP(v=>({...v,range:v.range+1})); if(pu.id==='def_res')setP(v=>({...v,def:v.def+1})); setOffered([]);
+                  }} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl hover:border-emerald-500"><div className="text-3xl">{pu.icon}</div><div className="text-xs font-bold">{pu.name}</div><div className="text-[8px] text-slate-500 uppercase">{pu.desc}</div></button>)}
                 </div>
               </div>
             </div>
           )}
 
-          {p.sp > 0 && offered.length === 0 && (
-            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
-              <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Instinto</h2>
-                <button onClick={()=>setP(v=>({...v, max:v.max+10, hp:v.hp+10, sp:v.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs">Vitalidade (+10 HP)</button>
-                <button onClick={()=>setP(v=>({...v, atk:v.atk+3, sp:v.sp-1}))} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Força (+3 Dano)</button>
-              </div>
-            </div>
-          )}
-
-          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center"><h2 className="text-7xl text-red-800 font-black mb-2 italic tracking-tighter uppercase">Fim da Linha</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600">REINICIAR</button></div>}
+          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center"><h2 className="text-7xl text-red-800 font-black mb-4">MORTE</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 rounded-full border-2 border-red-600">REINICIAR</button></div>}
         </div>
       );
     }

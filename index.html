@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Scaling Bosses</title>
+  <title>Lost in Blackwood - Combat HUD</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -59,18 +59,11 @@
         if (c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' };
       }));
 
-      // BOSS ESCALONADO POR ANDAR
       if (Math.random() < 0.20) {
         let bx = Math.floor(Math.random() * 8) + 12, by = Math.floor(Math.random() * 8) + 3;
         if(map[by]?.[bx]?.t === 'floor') {
-          map[by][bx].e = { 
-            type: 'boss', 
-            hp: 50 + (floor * 25), 
-            maxHp: 50 + (floor * 25), 
-            dmg: 6 + Math.floor(floor * 1.5), 
-            xp: 50 + (floor * 5), 
-            name: floor > 5 ? 'LÍDER SOMBRIO' : 'ANCIÃO' 
-          };
+          const bHp = 50 + (floor * 25);
+          map[by][bx].e = { type: 'boss', hp: bHp, maxHp: bHp, dmg: 6 + Math.floor(floor * 1.5), xp: 50 + (floor * 5), name: 'ANCIÃO' };
         }
       }
 
@@ -78,7 +71,8 @@
         let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
         if (map[ry]?.[rx]?.t === 'floor' && !map[ry][rx].e) {
           const base = ENEMY_TYPES[Math.floor(Math.random() * Math.min(floor, 4))];
-          map[ry][rx].e = { ...base, hp: base.hp + (floor * 2), dmg: base.dmg + Math.floor(floor/2) };
+          const eHp = base.hp + (floor * 2);
+          map[ry][rx].e = { ...base, hp: eHp, maxHp: eHp, dmg: base.dmg + Math.floor(floor/2) };
         }
       }
       map[MAP_H-2][MAP_W-2].t = 'stairs';
@@ -89,7 +83,7 @@
       const [floor, setFloor] = useState(1);
       const [p, setP] = useState({ x: 2, y: 2, hp: 35, max: 35, atk: 5, range: 1, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
       const [map, setMap] = useState(() => generateLevelMap(1));
-      const [log, setLog] = useState(["Blackwood: Bosses ficam mais fortes a cada andar."]);
+      const [log, setLog] = useState(["Blackwood: Fique atento à vida dos inimigos."]);
       const [inventory, setInventory] = useState([]); 
       const [pendingPowerUp, setPendingPowerUp] = useState(null); 
       const [offeredPowerUps, setOfferedPowerUps] = useState([]); 
@@ -158,19 +152,14 @@
           else setP(prev => ({ ...prev, f: nf }));
 
           if (targetEnemy.data.hp <= 0) {
-            const expGained = targetEnemy.data.xp;
             map[targetEnemy.y][targetEnemy.x].e = null;
             setP(prev => {
-              let nxp = prev.xp + expGained, nlvl = prev.lvl, nsp = prev.sp;
+              let nxp = prev.xp + targetEnemy.data.xp, nlvl = prev.lvl, nsp = prev.sp;
               const nextXpThreshold = prev.lvl * 15;
-              if (nxp >= nextXpThreshold) { 
-                nxp -= nextXpThreshold; 
-                nlvl++; 
-                nsp++; 
-              }
+              if (nxp >= nextXpThreshold) { nxp -= nextXpThreshold; nlvl++; nsp++; }
               return { ...prev, xp: nxp, lvl: nlvl, sp: nsp };
             });
-            currentLog.push(`${targetEnemy.data.type === 'boss' ? '🏆 BOSS ELIMINADO!' : 'Inimigo abatido!'} +${expGained} XP`);
+            currentLog.push("Abatido!");
           }
           processTurn(currentLog);
           return;
@@ -251,9 +240,23 @@
                   {row.map((c, x) => {
                     const vis = isVisible(x, y, p); if (vis) c.v = true;
                     let ch = "⬛"; let op = "opacity-0";
+                    
+                    const isEnemy = c.e && !['player', 'fruit'].includes(c.e.type);
+                    const showHp = isEnemy && vis && c.e.hp < c.e.maxHp;
+
                     if (vis) { ch = p.x===x && p.y===y ? EMOJIS.player : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
                     else if (c.v) { ch = EMOJIS[c.t]; op="opacity-10 grayscale"; }
-                    return <div key={x} className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-200 ${op}`}>{ch}</div>;
+                    
+                    return (
+                      <div key={x} className={`relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-200 ${op}`}>
+                        {ch}
+                        {showHp && (
+                          <div className="absolute -top-1 left-1 right-1 h-1 bg-black rounded-full overflow-hidden border border-slate-900">
+                            <div className="h-full bg-red-600" style={{ width: `${(c.e.hp / c.e.maxHp) * 100}%` }}></div>
+                          </div>
+                        )}
+                      </div>
+                    );
                   })}
                 </div>
               ))}

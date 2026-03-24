@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Combat & Level Up Fixed</title>
+  <title>Lost in Blackwood - Power Up Fix</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -15,8 +15,8 @@
     .minimap-bg { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 6px; box-shadow: inset 0 0 10px #000; }
     @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.3); background-color: #e879f9; } }
     .animate-boss-radar { animation: pulse-purple 0.8s infinite; border-radius: 50%; }
-    .critical-text { animation: bounce 0.5s infinite; color: #fbbf24; font-weight: 900; }
-    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+    .lvl-1 { border-color: #64748b; } .lvl-2 { border-color: #22c55e; } .lvl-3 { border-color: #3b82f6; } 
+    .lvl-4 { border-color: #a855f7; } .lvl-5 { border-color: #f97316; }
   </style>
 </head>
 <body class="select-none">
@@ -25,36 +25,34 @@
     const { useState, useEffect, useCallback } = React;
 
     const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", stairs: "🪜", fruit: "🍎", boss: "👿" };
+    
     const CLASSES = [
-      { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 40, atk: 5, range: 2, vis: 8, def: 0 } },
-      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 60, atk: 6, range: 1, vis: 5, def: 2 } },
-      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 30, atk: 10, range: 1, vis: 6, def: 0 } }
+      { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 40, max: 40, atk: 5, range: 2, vis: 8, def: 0 } },
+      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 60, max: 60, atk: 6, range: 1, vis: 5, def: 2 } },
+      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 30, max: 30, atk: 10, range: 1, vis: 6, def: 0 } }
     ];
+
     const POWER_CATALOG = [
-      { id: 'atk_dmg', name: 'Força', icon: '⚔️', desc: '+3 Dano' },
+      { id: 'atk_dmg', name: 'Força', icon: '⚔️', desc: '+2 Dano' },
       { id: 'atk_rng', name: 'Alcance', icon: '🏹', desc: '+1 Alcance' },
-      { id: 'def_res', name: 'Couraça', icon: '🛡️', desc: '-1 Dano Rec.' }
+      { id: 'atk_lch', name: 'Drenar', icon: '🩸', desc: 'Cura no Atq' },
+      { id: 'def_res', name: 'Couraça', icon: '🛡️', desc: '-1 Dano Rec.' },
+      { id: 'def_rfl', name: 'Espinhos', icon: '✨', desc: 'Reflete Dano' },
+      { id: 'hp_reg', name: 'Regen', icon: '❤️', desc: 'Cura / Andar' }
     ];
 
     const MAP_W = 24; const MAP_H = 14; 
-    const ENEMY_BASE = [{ type: 'bat', hp: 8, xp: 8, dmg: 2, name: 'Morcego' }, { type: 'slime', hp: 12, xp: 10, dmg: 3, name: 'Slime' }, { type: 'goblin', hp: 20, xp: 15, dmg: 4, name: 'Goblin' }];
+    const ENEMY_BASE = [{ type: 'bat', hp: 8, xp: 10, dmg: 3, name: 'Morcego' }, { type: 'slime', hp: 12, xp: 12, dmg: 4, name: 'Slime' }, { type: 'goblin', hp: 20, xp: 20, dmg: 5, name: 'Goblin' }];
 
     const generateMap = (floor) => {
       let map = [];
       const pStart = { x: 2, y: 2 };
-      let sPos = { x: 0, y: 0 };
-      let dist = 0;
-      while (dist < 15) {
-        sPos.x = Math.floor(Math.random() * (MAP_W - 4)) + 2;
-        sPos.y = Math.floor(Math.random() * (MAP_H - 4)) + 2;
-        dist = Math.abs(sPos.x - pStart.x) + Math.abs(sPos.y - pStart.y);
-      }
+      let sPos = { x: 20, y: 10 }; 
       for (let y = 0; y < MAP_H; y++) {
         let row = [];
         for (let x = 0; x < MAP_W; x++) {
           const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
-          const isInTunnel = (y === pStart.y && x <= Math.max(pStart.x, sPos.x) && x >= Math.min(pStart.x, sPos.x)) || 
-                             (x === sPos.x && y <= Math.max(pStart.y, sPos.y) && y >= Math.min(pStart.y, sPos.y));
+          const isInTunnel = (y === pStart.y && x <= sPos.x) || (x === sPos.x && y >= pStart.y);
           const isWall = isBorder || (Math.random() < 0.16 && !isInTunnel && !(x === pStart.x && y === pStart.y));
           row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
         }
@@ -69,10 +67,6 @@
           map[ry][rx].e = { ...base, hp: base.hp + (floor*2), maxHp: base.hp + (floor*2), dmg: base.dmg + Math.floor(floor/2) };
         }
       }
-      if (Math.random() < 0.3) {
-        let bx = Math.floor(Math.random() * 5) + 12, by = Math.floor(Math.random() * 5) + 5;
-        if (map[by][bx].t === 'floor') map[by][bx].e = { type: 'boss', hp: 50+(floor*20), maxHp: 50+(floor*20), dmg: 6+floor, xp: 100, name: 'GUARDIÃO' };
-      }
       return map;
     };
 
@@ -82,15 +76,26 @@
       const [p, setP] = useState(null);
       const [map, setMap] = useState([]);
       const [inventory, setInventory] = useState([]);
+      const [activePowers, setActivePowers] = useState([]); // [{id, lvl}]
       const [offered, setOffered] = useState([]);
-      const [turnCounter, setTurnCounter] = useState(0);
       const [combo, setCombo] = useState(0);
-      const [log, setLog] = useState(["Mate 3 inimigos sem levar dano para um CRÍTICO!"]);
 
       const start = (c) => {
         setCharClass(c);
-        setP({ ...c.stats, max: c.stats.hp, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' });
+        setP({ ...c.stats, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' });
         setMap(generateMap(1));
+      };
+
+      const selectPower = (pu) => {
+        setActivePowers(prev => {
+          const exists = prev.find(i => i.id === pu.id);
+          if (exists) return prev.map(i => i.id === pu.id ? { ...i, lvl: Math.min(5, i.lvl + 1) } : i);
+          return [...prev, { id: pu.id, lvl: 1 }];
+        });
+        // Aplica efeitos imediatos de Atributos
+        if (pu.id === 'atk_dmg') setP(v => ({...v, atk: v.atk + 2}));
+        if (pu.id === 'atk_rng') setP(v => ({...v, range: v.range + 1}));
+        setOffered([]);
       };
 
       const isVisible = (x, y, player) => {
@@ -121,38 +126,40 @@
         }
 
         if (targetEnemy) {
-          let isCritical = combo >= 3;
-          let finalDmg = isCritical ? p.atk * 2 : p.atk;
-          targetEnemy.e.hp -= finalDmg;
+          let isCrit = combo >= 3;
+          let dmg = isCrit ? p.atk * 2 : p.atk;
+          targetEnemy.e.hp -= dmg;
           
-          let newMsgs = isCritical ? ["🔥 GOLPE CRÍTICO!"] : [];
-          
+          // LIFESTEAL POWERUP
+          const leach = activePowers.find(i => i.id === 'atk_lch');
+          if (leach) setP(v => ({...v, hp: Math.min(v.max, v.hp + leach.lvl)}));
+
           if (targetEnemy.e.hp <= 0) {
             let nXp = p.xp + targetEnemy.e.xp;
             let nLvl = p.lvl, nSp = p.sp;
-            // CORREÇÃO: Verifica se subiu de nível aqui
-            if (nXp >= p.lvl * 25) { 
-               nXp -= (p.lvl * 25); 
-               nLvl++; 
-               nSp++; 
-               newMsgs.push(`✨ NÍVEL ${nLvl}! Escolha um upgrade.`);
-            }
+            if (nXp >= p.lvl * 25) { nXp -= (p.lvl * 25); nLvl++; nSp++; }
             setCombo(c => c + 1);
             setP(v => ({...v, xp: nXp, lvl: nLvl, sp: nSp, f: nf}));
             map[targetEnemy.y][targetEnemy.x].e = null;
-          } else { 
-            setP(v => ({...v, f: nf})); 
-          }
-          if(newMsgs.length > 0) setLog(prev => [...newMsgs, ...prev].slice(0, 5));
+          } else { setP(v => ({...v, f: nf})); }
           processAI(p.x, p.y); return;
         }
 
         const cell = map[ny]?.[nx];
         if (!cell || cell.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
+        
         if (cell.t === 'stairs') {
-          const nF = floor + 1; setFloor(nF);
-          setMap(generateMap(nF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN'}));
-          setOffered([...POWER_CATALOG].sort(() => 0.5 - Math.random())); return;
+          const nextF = floor + 1;
+          setFloor(nextF);
+          // REGEN POWERUP AO SUBIR ANDAR
+          const regen = activePowers.find(i => i.id === 'hp_reg');
+          let healedHp = p.hp;
+          if (regen) healedHp = Math.min(p.max, p.hp + Math.floor(p.max * (0.05 * regen.lvl)));
+          
+          setMap(generateMap(nextF));
+          setP(v => ({...v, x: 2, y: 2, f: 'DOWN', hp: healedHp}));
+          setOffered([...POWER_CATALOG].sort(() => 0.5 - Math.random()).slice(0, 3));
+          return;
         }
 
         if (cell.e?.type === 'fruit') {
@@ -165,14 +172,22 @@
       };
 
       const processAI = (px, py) => {
-        let dmgRec = 0;
-        setTurnCounter(t => t + 1);
+        let dmgTaken = 0;
+        const resPower = activePowers.find(i => i.id === 'def_res')?.lvl || 0;
+        const rflPower = activePowers.find(i => i.id === 'def_rfl')?.lvl || 0;
+
         const newMap = map.map(row => row.map(c => {
           if (c.e && !['fruit', 'player'].includes(c.e.type)) {
             const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
             if (dx <= 1 && dy <= 1) {
-              dmgRec += Math.max(1, c.e.dmg - p.def);
-            } else if (Math.random() > 0.4 && !(c.e.type === 'boss' && turnCounter % 2 !== 0)) {
+              let hit = Math.max(1, c.e.dmg - (p.def + resPower));
+              dmgTaken += hit;
+              // REFLECT POWERUP
+              if (rflPower > 0) {
+                c.e.hp -= Math.floor(hit * (0.2 * rflPower));
+                if (c.e.hp <= 0) return { ...c, e: null };
+              }
+            } else if (Math.random() > 0.5) {
               const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
               if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) 
                 return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
@@ -180,29 +195,27 @@
           }
           return c;
         }));
-        if (dmgRec > 0) setCombo(0); // Reseta combo ao levar dano
+        if (dmgTaken > 0) setCombo(0);
         newMap.forEach(r => r.forEach(c => { if(c.next) { newMap[c.next.ny][c.next.nx].e = c.next; delete c.next; } }));
-        setMap(newMap); setP(v => ({ ...v, hp: v.hp - dmgRec }));
+        setMap(newMap); setP(v => ({ ...v, hp: v.hp - dmgTaken }));
       };
 
       useEffect(() => {
         const h = (e) => {
           if (e.key.toLowerCase() === 'h' && p && inventory.length > 0) { 
-             setInventory(v => v.slice(1)); 
-             setP(v => ({...v, hp: Math.min(v.max, v.hp + 20)})); 
-             setLog(prev => ["❤️ Curado!", ...prev]);
+             setInventory(v => v.slice(1)); setP(v => ({...v, hp: Math.min(v.max, v.hp + 20)})); 
           }
           const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
           if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
         };
         window.addEventListener('keydown', h);
         return () => window.removeEventListener('keydown', h);
-      }, [p, map, inventory, offered, combo]);
+      }, [p, map, inventory, offered, combo, activePowers]);
 
       if (!charClass) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 text-center">
-          <h1 className="text-4xl font-black text-red-600 mb-2 italic">LOST IN BLACKWOOD</h1>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl mt-10">
+          <h1 className="text-4xl font-black text-red-600 mb-10 italic">LOST IN BLACKWOOD</h1>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
             {CLASSES.map(c => (
               <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all group">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
@@ -229,8 +242,8 @@
                       <div key={x} className="relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl">
                         <div className={op}>{char}</div>
                         {c.e && vis && c.e.hp < c.e.maxHp && (
-                          <div className="absolute -top-1 w-7 h-1 bg-black rounded-full border border-slate-800 overflow-hidden">
-                             <div className={`h-full transition-all ${c.e.hp < c.e.maxHp/3 ? 'bg-red-600' : c.e.hp < c.e.maxHp/1.5 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div>
+                          <div className="absolute -top-1 w-7 h-1 bg-black rounded-full overflow-hidden">
+                             <div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div>
                           </div>
                         )}
                       </div>
@@ -243,16 +256,20 @@
             <div className="w-full lg:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
                 <div className="flex justify-between text-red-500 uppercase mb-1"><span>Vida</span><span>{p.hp}/{p.max}</span></div>
-                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
+                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
                 
                 <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-center mb-4">
                    <p className="text-emerald-400 mb-1 text-[8px] uppercase tracking-widest">Mochila: {inventory.length}/3 | Combo: {combo}/3</p>
                    <div className="flex justify-center gap-1 mb-1">{inventory.map((_,i)=><span key={i}>🍎</span>)}</div>
-                   <p className={`${combo >= 3 ? 'critical-text' : 'text-white'} text-[8px] uppercase`}>{combo >= 3 ? 'CRÍTICO PRONTO!' : 'Aperte [H] para curar'}</p>
+                   <p className="text-white text-[8px] uppercase">{combo >= 3 ? 'CRÍTICO PRONTO!' : 'Aperte [H] para curar'}</p>
                 </div>
 
                 <div className="flex justify-between text-blue-500 uppercase mb-1"><span>XP NV {p.lvl}</span><span>{Math.floor(p.xp)}/{p.lvl*25}</span></div>
                 <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*25))*100}%`}}></div></div>
+                
+                <div className="flex flex-wrap gap-1 mt-4">
+                   {activePowers.map(i => <div key={i.id} className={`lvl-border border px-1 rounded text-[8px] bg-black/40 lvl-${i.lvl}`}>{POWER_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
+                </div>
               </div>
 
               <div className="minimap-bg flex justify-center">
@@ -261,7 +278,7 @@
                     let col = "bg-transparent";
                     if (c.v) {
                       if (p.x===x && p.y===y) col = "bg-emerald-400 shadow-[0_0_5px_#34d399]";
-                      else if (c.e && isVisible(x,y,p)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-500";
+                      else if (c.e && isVisible(x,y,p)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
                       else if (c.t==='stairs') col = "bg-yellow-400 shadow-[0_0_5px_#facc15]";
                       else if (c.t==='wall') col = "bg-slate-700";
                       else col = "bg-slate-800";
@@ -270,39 +287,31 @@
                   }))}
                 </div>
               </div>
-
-              <div className="bg-black/60 p-3 rounded-xl border border-slate-800 h-24 overflow-hidden text-[9px] text-slate-500 italic">
-                {log.map((m, i) => <div key={i} className={i===0?"text-emerald-400 font-bold":""}>{m}</div>)}
-              </div>
             </div>
           </div>
 
-          {/* UPGRADES DE ANDAR */}
           {offered.length > 0 && (
-            <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
+            <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4 text-white">
               <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-xl w-full">
-                <h2 className="text-xl text-emerald-500 font-black mb-6 uppercase italic tracking-widest">Dádiva da Floresta</h2>
+                <h2 className="text-xl font-black mb-6 uppercase italic tracking-widest text-emerald-400">Dádiva da Floresta (Andar {floor})</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {offered.map(pu => <button key={pu.id} onClick={()=>{
-                    if(pu.id==='atk_dmg')setP(v=>({...v,atk:v.atk+3})); if(pu.id==='atk_rng')setP(v=>({...v,range:v.range+1})); if(pu.id==='def_res')setP(v=>({...v,def:v.def+1})); setOffered([]);
-                  }} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center"><div className="text-3xl mb-1">{pu.icon}</div><div className="text-xs font-bold text-white uppercase">{pu.name}</div><div className="text-[8px] text-slate-500 uppercase mt-1">{pu.desc}</div></button>)}
+                  {offered.map(pu => <button key={pu.id} onClick={() => selectPower(pu)} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl hover:border-emerald-500 transition-all text-center"><div className="text-3xl mb-1">{pu.icon}</div><div className="text-xs font-bold uppercase">{pu.name}</div><div className="text-[8px] text-slate-500 mt-1">{pu.desc}</div></button>)}
                 </div>
               </div>
             </div>
           )}
 
-          {/* UPGRADES DE LEVEL UP (INSTINTO) */}
           {p && p.sp > 0 && offered.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
               <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic tracking-tighter">Evolução de Instinto</h2>
-                <button onClick={()=>setP(v=>({...v, max:v.max+10, hp:v.hp+10, sp:v.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs transition-all">Vitalidade (+10 HP)</button>
-                <button onClick={()=>setP(v=>({...v, atk:v.atk+3, sp:v.sp-1}))} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs transition-all">Força (+3 Dano)</button>
+                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic tracking-tighter">Evolução</h2>
+                <button onClick={()=>setP(v=>({...v, max:v.max+10, hp:v.hp+10, sp:v.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 font-bold uppercase text-xs">Vitalidade (+10 HP)</button>
+                <button onClick={()=>setP(v=>({...v, atk:v.atk+3, sp:v.sp-1}))} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Força (+3 Dano)</button>
               </div>
             </div>
           )}
 
-          {p && p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center"><h2 className="text-7xl text-red-800 font-black mb-4">MORTE</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 rounded-full border-2 border-red-600 shadow-lg">REINICIAR</button></div>}
+          {p && p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center"><h2 className="text-7xl text-red-800 font-black mb-4 uppercase italic">Morte</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 rounded-full border-2 border-red-600 shadow-lg">Reiniciar</button></div>}
         </div>
       );
     }

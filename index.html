@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Impact & Hall of Legends</title>
+  <title>Lost in Blackwood - Eternal Legacy</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -13,42 +13,64 @@
     .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.5s ease; }
     .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.5s ease; }
     
-    /* ANIMAÇÃO DE TREMOR MELHORADA */
-    .shake { animation: shakeAnim 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+    /* EFEITO TREMOR */
+    .shake-fx { animation: shakeAnim 0.3s cubic-bezier(.36,.07,.19,.97) both; }
     @keyframes shakeAnim {
       10%, 90% { transform: translate3d(-2px, 0, 0); }
       20%, 80% { transform: translate3d(3px, 0, 0); }
-      30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
-      40%, 60% { transform: translate3d(5px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+      40%, 60% { transform: translate3d(6px, 0, 0); }
     }
 
-    /* FLASH DE LEVEL UP */
-    .flash-lvl { animation: flashAnim 0.6s ease-out; }
+    /* EFEITO FLASH */
+    .flash-fx { animation: flashAnim 0.6s ease-out forwards; }
     @keyframes flashAnim {
-      0% { background-color: rgba(251, 191, 36, 0.4); }
+      0% { background-color: rgba(251, 191, 36, 0.6); }
       100% { background-color: transparent; }
     }
 
     .minimap-bg { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 6px; box-shadow: inset 0 0 10px #000; }
-    @keyframes pulse-purple { 0%, 100% { transform: scale(1); background-color: #a855f7; } 50% { transform: scale(1.3); background-color: #e879f9; } }
-    .animate-boss-radar { animation: pulse-purple 0.8s infinite; border-radius: 50%; }
     .milestone-card { background: rgba(15, 23, 42, 0.8); border: 1px solid #1e293b; transition: all 0.3s; }
-    .unlocked { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.2); background: rgba(251, 191, 36, 0.05); }
+    .unlocked { border-color: #fbbf24; background: rgba(251, 191, 36, 0.05); }
   </style>
 </head>
 <body class="select-none text-slate-200">
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect, useCallback } = React;
+    const { useState, useEffect, useCallback, useRef } = React;
 
-    const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", stairs: "🪜", fruit: "🍎", boss: "👿", blood: "🩸" };
+    const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", stairs: "🪜", fruit: "🍎", blood: "🩸" };
     const CLASSES = [
       { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 45, max: 45, atk: 5, range: 2, vis: 8, def: 0 } },
       { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 70, max: 70, atk: 6, range: 1, vis: 5, def: 2 } },
-      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 35, max: 35, atk: 11, range: 1, vis: 6, def: 0 } }
+      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 35, max: 35, atk: 12, range: 1, vis: 6, def: 0 } }
     ];
     const MAP_W = 24; const MAP_H = 14; 
-    const ENEMY_BASE = [{ type: 'bat', hp: 12, xp: 10, dmg: 4, name: 'Morcego' }, { type: 'slime', hp: 18, xp: 12, dmg: 5, name: 'Slime' }, { type: 'goblin', hp: 30, xp: 20, dmg: 8, name: 'Goblin' }];
+    const ENEMIES = [{ type: 'bat', hp: 12, xp: 10, dmg: 4 }, { type: 'slime', hp: 18, xp: 12, dmg: 5 }, { type: 'goblin', hp: 30, xp: 20, dmg: 8 }];
+
+    const generateLevel = (f) => {
+      let m = [];
+      for (let y = 0; y < MAP_H; y++) {
+        let row = [];
+        for (let x = 0; x < MAP_W; x++) {
+          const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
+          const isSafe = (y === 2 && x < 6); // Área inicial segura
+          const isWall = isBorder || (!isSafe && Math.random() < 0.16 && x > 4);
+          row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false, b: false });
+        }
+        m.push(row);
+      }
+      m[11][21].t = 'stairs';
+      m.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04 && c.x > 5) c.e = { type: 'fruit' }; }));
+      for (let i = 0; i < 6 + (f * 2); i++) {
+        let rx = Math.floor(Math.random() * (MAP_W-4)) + 3, ry = Math.floor(Math.random() * (MAP_H-4)) + 2;
+        if (m[ry][rx].t === 'floor' && !m[ry][rx].e) {
+          const base = ENEMIES[Math.floor(Math.random() * ENEMIES.length)];
+          m[ry][rx].e = { ...base, hp: base.hp + (f*5), maxHp: base.hp + (f*5), dmg: base.dmg + Math.floor(f*1.5) };
+        }
+      }
+      return m;
+    };
 
     function App() {
       const [charClass, setCharClass] = useState(null);
@@ -58,197 +80,32 @@
       const [inventory, setInventory] = useState([]);
       const [isDead, setIsDead] = useState(false);
       const [combo, setCombo] = useState(0);
-      const [shake, setShake] = useState(false);
-      const [flash, setFlash] = useState(false);
+      const [shakeKey, setShakeKey] = useState(0); // Para forçar animação
+      const [flashKey, setFlashKey] = useState(0); // Para forçar animação
       const [showMilestones, setShowMilestones] = useState(false);
       const [meta, setMeta] = useState(() => {
-        const saved = localStorage.getItem('bw_meta_v3');
+        const saved = localStorage.getItem('bw_meta_v4');
         return saved ? JSON.parse(saved) : { totalKills: 0, maxFloor: 0, maxLevel: 0 };
       });
 
-      const triggerShake = () => { setShake(true); setTimeout(() => setShake(false), 300); };
-      const triggerFlash = () => { setFlash(true); setTimeout(() => setFlash(false), 600); };
-
-      const generateLevel = (f) => {
-        let m = [];
-        for (let y = 0; y < MAP_H; y++) {
-          let row = [];
-          for (let x = 0; x < MAP_W; x++) {
-            const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
-            const isWall = isBorder || (Math.random() < 0.16 && x > 4 && !(y===2 && x < 20));
-            row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false, b: false });
-          }
-          m.push(row);
-        }
-        m[10][20].t = 'stairs';
-        m.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04 && c.x > 5) c.e = { type: 'fruit' }; }));
-        for (let i = 0; i < 6 + (f * 2); i++) {
-          let rx = Math.floor(Math.random() * 18) + 5, ry = Math.floor(Math.random() * 12) + 1;
-          if (m[ry][rx].t === 'floor' && !m[ry][rx].e) {
-            const base = ENEMY_BASE[Math.floor(Math.random() * ENEMY_BASE.length)];
-            const hp = base.hp + (f * 5);
-            m[ry][rx].e = { ...base, hp, maxHp: hp, dmg: base.dmg + Math.floor(f * 1.5) };
-          }
-        }
-        return m;
-      };
-
-      const start = (selectedClass) => {
-        let bonus = { atk: 0, vis: 0, hp: 0 };
-        if (meta.totalKills >= 50) bonus.atk += 2;
-        if (meta.totalKills >= 200) bonus.atk += 5;
-        if (meta.maxFloor >= 15) bonus.vis += 1;
-        if (meta.maxFloor >= 30) bonus.vis += 2;
-        if (meta.maxLevel >= 10) bonus.hp += 20;
-        if (meta.maxLevel >= 25) bonus.hp += 50;
-
-        const initialP = { 
-          ...selectedClass.stats, 
-          atk: selectedClass.stats.atk + bonus.atk,
-          vis: selectedClass.stats.vis + bonus.vis,
-          max: selectedClass.stats.max + bonus.hp,
-          hp: selectedClass.stats.max + bonus.hp,
+      const start = (selClass) => {
+        let bonus = { atk: meta.totalKills >= 50 ? 2 : 0, vis: meta.maxFloor >= 15 ? 1 : 0, hp: meta.maxLevel >= 10 ? 20 : 0 };
+        const finalStats = { 
+          ...selClass.stats, 
+          atk: selClass.stats.atk + bonus.atk,
+          vis: selClass.stats.vis + bonus.vis,
+          max: selClass.stats.max + bonus.hp,
+          hp: selClass.stats.max + bonus.hp,
           x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' 
         };
-        setP(initialP);
-        setCharClass(selectedClass);
-        setMap(generateLevel(1));
-        setFloor(1);
-        setIsDead(false);
-        setInventory([]);
-        setCombo(0);
+        setP(finalStats); setCharClass(selClass); setMap(generateLevel(1)); setFloor(1); setIsDead(false); setInventory([]); setCombo(0);
       };
 
-      const move = (dx, dy) => {
-        if (!p || isDead || p.sp > 0) return;
-        const nx = p.x + dx, ny = p.y + dy;
-        const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
-        
-        let targetE = null;
-        for (let r = 1; r <= p.range; r++) {
-          let tx = p.x + (dx * r), ty = p.y + (dy * r);
-          if (map[ty]?.[tx]?.e) { targetE = { x: tx, y: ty, e: map[ty][tx].e }; break; }
-          if (map[ty]?.[tx]?.t === 'wall') break;
-        }
-
-        if (targetE) {
-          const isCrit = combo >= 3;
-          targetE.e.hp -= (isCrit ? p.atk * 2 : p.atk);
-          if (isCrit) triggerShake();
-          if (targetE.e.hp <= 0) {
-            map[targetE.y][targetE.x].b = true; 
-            const newMeta = { ...meta, totalKills: meta.totalKills + 1 };
-            setMeta(newMeta); localStorage.setItem('bw_meta_v3', JSON.stringify(newMeta));
-            let nXp = p.xp + targetE.e.xp;
-            if (nXp >= p.lvl * 40) { 
-               nXp -= (p.lvl * 40); 
-               const nLvl = p.lvl + 1;
-               if (nLvl > meta.maxLevel) { newMeta.maxLevel = nLvl; setMeta({...newMeta}); localStorage.setItem('bw_meta_v3', JSON.stringify(newMeta)); }
-               setP(v => ({...v, xp: nXp, lvl: nLvl, sp: v.sp + 1, f: nf}));
-               triggerFlash();
-            } else { setP(v => ({...v, xp: nXp, f: nf})); }
-            setCombo(c => c + 1); map[targetE.y][targetE.x].e = null;
-          } else { setP(v => ({...v, f: nf})); }
-          processAI(p.x, p.y); return;
-        }
-
-        const cell = map[ny]?.[nx];
-        if (!cell || cell.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
-        if (cell.t === 'stairs') {
-          const nF = floor + 1; setFloor(nF);
-          if (nF > meta.maxFloor) { const m = {...meta, maxFloor: nF}; setMeta(m); localStorage.setItem('bw_meta_v3', JSON.stringify(m)); }
-          setMap(generateLevel(nF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN'}));
-          return;
-        }
-        if (cell.e?.type === 'fruit') {
-          if (inventory.length < 3) setInventory(v => [...v, 'apple']);
-          else setP(v => ({...v, hp: Math.min(v.max, v.hp + 15)}));
-          cell.e = null;
-        }
-        setP(v => ({...v, x: nx, y: ny, f: nf}));
-        processAI(nx, ny);
-      };
-
-      const processAI = (px, py) => {
-        let dmg = 0;
-        const newMap = map.map(row => row.map(c => {
-          if (c.e) {
-            const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
-            if (dx <= 1 && dy <= 1) { dmg += Math.max(1, c.e.dmg - p.def); }
-            else if (Math.random() > 0.5) {
-              const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
-              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) 
-                return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
-            }
-          }
-          return c;
-        }));
-        if (dmg > 0) setCombo(0);
-        if (dmg > 5) triggerShake();
-        newMap.forEach(r => r.forEach(c => { if(c.next) { newMap[c.next.ny][c.next.nx].e = c.next; delete c.next; } }));
-        setMap(newMap); 
-        const fHp = p.hp - dmg;
-        if (fHp <= 0) setIsDead(true);
-        setP(v => ({ ...v, hp: fHp }));
-      };
-
-      useEffect(() => {
-        const h = (e) => {
-          if (e.key.toLowerCase() === 'h' && p && inventory.length > 0) { 
-             setInventory(v => v.slice(1)); setP(v => ({...v, hp: Math.min(v.max, v.hp + 20)})); 
-          }
-          const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
-          if (k[e.key]) move(...k[e.key]);
-        };
-        window.addEventListener('keydown', h);
-        return () => window.removeEventListener('keydown', h);
-      }, [p, map, inventory, isDead, combo]);
-
-      if (!charClass) return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 overflow-y-auto">
-          <h1 className="text-5xl font-black text-red-600 mb-8 italic uppercase">Lost in Blackwood</h1>
-          <div className="flex gap-4 mb-10">
-            <button onClick={() => setShowMilestones(false)} className={`px-6 py-2 rounded-full text-xs font-bold uppercase transition ${!showMilestones ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-500'}`}>Herdeiros</button>
-            <button onClick={() => setShowMilestones(true)} className={`px-6 py-2 rounded-full text-xs font-bold uppercase transition ${showMilestones ? 'bg-yellow-600 text-white' : 'bg-slate-900 text-slate-500'}`}>Conquistas</button>
-          </div>
-          {!showMilestones ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
-              {CLASSES.map(c => (
-                <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-8 rounded-3xl hover:border-red-600 transition-all group">
-                  <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
-                  <h3 className="text-xl font-bold uppercase">{c.name}</h3>
-                  <div className="text-[10px] text-slate-500 mt-2">Poder da Linhagem Ativo</div>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-5xl">
-              {[
-                { name: 'Exterminador I', target: 50, val: meta.totalKills, desc: '+2 ATK', icon: '💀' },
-                { name: 'Exterminador II', target: 200, val: meta.totalKills, desc: '+5 ATK', icon: '⚔️' },
-                { name: 'Explorador I', target: 15, val: meta.maxFloor, desc: '+1 Visão', icon: '👁️' },
-                { name: 'Explorador II', target: 30, val: meta.maxFloor, desc: '+2 Visão', icon: '🗺️' },
-                { name: 'Veterano', target: 10, val: meta.maxLevel, desc: '+20 HP', icon: '🩸' },
-                { name: 'Imortal', target: 25, val: meta.maxLevel, desc: '+50 HP', icon: '👑' },
-              ].map((m, i) => (
-                <div key={i} className={`p-4 rounded-2xl milestone-card ${m.val >= m.target ? 'unlocked' : 'opacity-40'}`}>
-                  <div className="text-2xl mb-2">{m.icon}</div>
-                  <p className="text-xs font-black uppercase text-white">{m.name}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">{m.desc}</p>
-                  <div className="w-full bg-black h-1.5 rounded-full mt-3 overflow-hidden"><div className="bg-yellow-500 h-full" style={{width: `${Math.min(100, (m.val/m.target)*100)}%`}}></div></div>
-                  <p className="text-[8px] mt-1 text-right font-bold text-yellow-600">{m.val}/{m.target}</p>
-                </div>
-              ))}
-            </div>
-          )}
-          <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="mt-12 text-[10px] uppercase font-bold text-red-900">Resetar Tudo</button>
-        </div>
-      );
-
-      const isVisibleCone = (x, y) => {
+      const isVisible = (x, y) => {
+        if (!p) return false;
         const dx = x - p.x, dy = y - p.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < 1.6) return true;
+        if (dist < 1.5) return true;
         if (dist > p.vis) return false;
         const angle = Math.atan2(dy, dx);
         let targetAngle = p.f === 'UP' ? -Math.PI/2 : p.f === 'DOWN' ? Math.PI/2 : p.f === 'LEFT' ? Math.PI : 0;
@@ -257,46 +114,191 @@
         return diff < 0.8;
       };
 
+      const move = (dx, dy) => {
+        if (!p || isDead || p.sp > 0) return;
+        const nx = p.x + dx, ny = p.y + dy;
+        const nf = dx > 0 ? 'RIGHT' : dx < 0 ? 'LEFT' : dy > 0 ? 'DOWN' : 'UP';
+        
+        // 1. Verificar Ataque
+        let targetE = null;
+        for (let r = 1; r <= p.range; r++) {
+          let tx = p.x + (dx * r), ty = p.y + (dy * r);
+          if (map[ty]?.[tx]?.e && map[ty][tx].e.type !== 'fruit') { targetE = { x: tx, y: ty, e: map[ty][tx].e }; break; }
+          if (map[ty]?.[tx]?.t === 'wall') break;
+        }
+
+        if (targetE) {
+          const isCrit = combo >= 3;
+          targetE.e.hp -= (isCrit ? p.atk * 2 : p.atk);
+          if (isCrit) setShakeKey(prev => prev + 1);
+          if (targetE.e.hp <= 0) {
+            map[targetE.y][targetE.x].b = true; 
+            const newMeta = { ...meta, totalKills: meta.totalKills + 1 };
+            setMeta(newMeta); localStorage.setItem('bw_meta_v4', JSON.stringify(newMeta));
+            let nXp = p.xp + targetE.e.xp;
+            if (nXp >= p.lvl * 40) { 
+               nXp -= (p.lvl * 40); 
+               setFlashKey(prev => prev + 1);
+               setP(v => ({...v, xp: nXp, lvl: v.lvl + 1, sp: v.sp + 1, f: nf}));
+            } else { setP(v => ({...v, xp: nXp, f: nf})); }
+            setCombo(c => c + 1); map[targetE.y][targetE.x].e = null;
+          } else { setP(v => ({...v, f: nf})); }
+          processAI(p.x, p.y); return;
+        }
+
+        // 2. Verificar Movimento
+        const cell = map[ny]?.[nx];
+        if (!cell || cell.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
+        
+        if (cell.t === 'stairs') {
+          const nextF = floor + 1; setFloor(nextF);
+          if (nextF > meta.maxFloor) { const m = {...meta, maxFloor: nextF}; setMeta(m); localStorage.setItem('bw_meta_v4', JSON.stringify(m)); }
+          setMap(generateLevel(nextF)); setP(v => ({...v, x: 2, y: 2, f: 'DOWN'}));
+          return;
+        }
+
+        let newInv = [...inventory];
+        let newHp = p.hp;
+        if (cell.e?.type === 'fruit') {
+          if (newInv.length < 3) newInv.push('apple');
+          else newHp = Math.min(p.max, p.hp + 15);
+          cell.e = null; // COMIDA COLETADA - CAMINHO LIVRE
+        }
+
+        setP(v => ({...v, x: nx, y: ny, f: nf, hp: newHp}));
+        setInventory(newInv);
+        processAI(nx, ny);
+      };
+
+      const processAI = (px, py) => {
+        let damageRec = 0;
+        const newMap = map.map(row => row.map(c => {
+          if (c.e && c.e.type !== 'fruit') {
+            const dx = Math.abs(px - c.x), dy = Math.abs(py - c.y);
+            if (dx <= 1 && dy <= 1) { damageRec += Math.max(1, c.e.dmg - p.def); return c; }
+            else if (Math.random() > 0.5) {
+              const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
+              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e) return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
+            }
+          }
+          return c;
+        }));
+        if (damageRec > 0) { setCombo(0); if(damageRec > 5) setShakeKey(v => v + 1); }
+        newMap.forEach(r => r.forEach(c => { if(c.next) { newMap[c.next.ny][c.next.nx].e = c.next; delete c.next; } }));
+        setMap(newMap); 
+        if (p.hp - damageRec <= 0) setIsDead(true);
+        setP(v => ({ ...v, hp: v.hp - damageRec }));
+      };
+
+      useEffect(() => {
+        const handleK = (e) => {
+          if (e.key.toLowerCase() === 'h' && inventory.length > 0) {
+            setInventory(v => v.slice(1)); setP(v => ({...v, hp: Math.min(v.max, v.hp + 25)}));
+          }
+          const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+          if (k[e.key]) move(...k[e.key]);
+        };
+        window.addEventListener('keydown', handleK);
+        return () => window.removeEventListener('keydown', handleK);
+      }, [p, map, inventory, isDead, combo]);
+
+      if (!charClass) return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6">
+          <h1 className="text-6xl font-black text-red-600 mb-8 italic uppercase tracking-tighter">Lost in Blackwood</h1>
+          <div className="flex gap-4 mb-8">
+            <button onClick={() => setShowMilestones(false)} className={`px-8 py-2 rounded-full text-sm font-bold uppercase transition ${!showMilestones ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-500'}`}>Herdeiros</button>
+            <button onClick={() => setShowMilestones(true)} className={`px-8 py-2 rounded-full text-sm font-bold uppercase transition ${showMilestones ? 'bg-yellow-600 text-white' : 'bg-slate-900 text-slate-500'}`}>Conquistas</button>
+          </div>
+
+          {!showMilestones ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
+              {CLASSES.map(c => (
+                <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-8 rounded-3xl hover:border-red-600 transition-all group">
+                  <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
+                  <h3 className="text-2xl font-bold uppercase">{c.name}</h3>
+                  <p className="text-[10px] text-slate-500 mt-2 font-bold tracking-widest">REIVINDICAR SANGUE</p>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-5xl">
+              {[
+                { name: 'Exterminador', target: 50, val: meta.totalKills, desc: '+2 ATK Base', icon: '💀' },
+                { name: 'Explorador', target: 15, val: meta.maxFloor, desc: '+1 Visão Base', icon: '👁️' },
+                { name: 'Veterano', target: 10, val: meta.maxLevel, desc: '+20 HP Base', icon: '🩸' },
+              ].map((m, i) => (
+                <div key={i} className={`p-6 rounded-3xl milestone-card ${m.val >= m.target ? 'unlocked' : 'opacity-40'}`}>
+                  <div className="text-3xl mb-2">{m.icon}</div>
+                  <p className="font-black uppercase text-white">{m.name}</p>
+                  <p className="text-xs text-slate-400">{m.desc}</p>
+                  <div className="w-full bg-black h-2 rounded-full mt-4 overflow-hidden">
+                    <div className="bg-yellow-500 h-full" style={{width: `${Math.min(100, (m.val/m.target)*100)}%`}}></div>
+                  </div>
+                  <p className="text-[10px] mt-2 font-bold text-yellow-600">{m.val} / {m.target}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+
       return (
-        <div className={`flex flex-col items-center justify-center min-h-screen p-4 ${flash ? 'flash-lvl' : ''}`}>
-          <div className={`flex flex-col lg:flex-row gap-6 ${shake ? 'shake' : ''}`}>
-            <div className="bg-black border-4 border-slate-900 p-1 rounded-2xl shadow-2xl overflow-hidden relative">
+        <div key={flashKey} className={`flex flex-col items-center justify-center min-h-screen p-4 ${flashKey > 0 ? 'flash-fx' : ''}`}>
+          <div key={shakeKey} className={`flex flex-col lg:flex-row gap-8 ${shakeKey > 0 ? 'shake-fx' : ''}`}>
+            {/* MAPA */}
+            <div className="bg-black border-4 border-slate-900 p-1 rounded-3xl shadow-2xl overflow-hidden relative">
               {map.map((row, y) => (
                 <div key={y} className="flex">
                   {row.map((c, x) => {
-                    const vis = isVisibleCone(x, y); if (vis) c.v = true;
+                    const vis = isVisible(x, y); if (vis) c.v = true;
                     let char = "⬛"; let op = "opacity-0";
-                    if (vis) { char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : (c.b ? EMOJIS.blood : EMOJIS[c.t])); op="opacity-100"; }
-                    else if (c.v) { char = c.b ? EMOJIS.blood : EMOJIS[c.t]; op="opacity-10 grayscale"; }
+                    if (vis) { 
+                      char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : (c.b ? EMOJIS.blood : EMOJIS[c.t])); 
+                      op="opacity-100"; 
+                    } else if (c.v) { char = c.b ? EMOJIS.blood : EMOJIS[c.t]; op="opacity-10 grayscale"; }
+                    
                     return (
-                      <div key={x} className="relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl">
-                        <div className={`${op} ${c.b && vis ? 'brightness-50' : ''}`}>{char}</div>
-                        {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-7 h-1 bg-black rounded-full overflow-hidden border border-slate-800"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
+                      <div key={x} className={`relative w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-2xl`}>
+                        <div className={`${op} ${c.b && vis ? 'brightness-75' : ''}`}>{char}</div>
+                        {c.e && vis && c.e.hp < c.e.maxHp && (
+                          <div className="absolute -top-1 w-8 h-1 bg-black rounded-full overflow-hidden border border-slate-800">
+                             <div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               ))}
             </div>
-            <div className="w-full lg:w-72 flex flex-col gap-4 font-mono">
-              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
-                <div className="flex justify-between text-red-500 uppercase mb-1 italic"><span>Vida</span><span>{Math.max(0, p.hp)}/{p.max}</span></div>
-                <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
-                <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-center mb-4">
-                   <p className="text-emerald-400 mb-1 text-[8px] uppercase font-black">Mochila: {inventory.length}/3 | Combo: {combo}/3</p>
-                   <div className="flex justify-center gap-1">{inventory.map((_,i)=><span key={i}>🍎</span>)}</div>
+
+            {/* STATUS */}
+            <div className="w-full lg:w-80 flex flex-col gap-6 font-mono">
+              <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
+                <div className="flex justify-between text-red-500 uppercase font-black text-xs mb-2"><span>Vitalidade</span><span>{Math.max(0, p.hp)}/{p.max}</span></div>
+                <div className="w-full bg-black h-4 rounded-full overflow-hidden border border-slate-800 p-1 mb-6 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${(p.hp/p.max)*100}%`}}></div></div>
+                
+                <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700 text-center mb-6">
+                   <p className="text-emerald-400 text-[10px] uppercase font-black tracking-widest mb-2">Mochila: {inventory.length}/3 | Combo: {combo}/3</p>
+                   <div className="flex justify-center gap-2 text-2xl mb-2">
+                    {inventory.map((_,i)=><span key={i}>🍎</span>)}
+                    {inventory.length===0 && <span className="opacity-10">Vazio</span>}
+                   </div>
+                   <p className="text-white text-[10px] animate-pulse">PRESS [H] PARA CURAR</p>
                 </div>
-                <div className="flex justify-between text-blue-500 uppercase mb-1"><span>NV {p.lvl}</span><span>{Math.floor(p.xp)}/{p.lvl*40}</span></div>
-                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*40))*100}%`}}></div></div>
+
+                <div className="flex justify-between text-blue-400 uppercase font-black text-xs mb-2"><span>Nível {p.lvl}</span><span>{Math.floor(p.xp)}/{(p.lvl*40)}</span></div>
+                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*40))*100}%`}}></div></div>
               </div>
-              <div className="minimap-bg flex justify-center p-3">
+
+              <div className="minimap-bg flex justify-center p-4">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns: `repeat(${MAP_W}, 1fr)`}}>
                   {map.map((row, y) => row.map((c, x) => {
                     let col = "bg-transparent";
                     if (c.v) {
                       if (p.x===x && p.y===y) col = "bg-emerald-400";
-                      else if (c.e && isVisibleCone(x,y)) col = "bg-red-600";
-                      else if (c.t==='stairs') col = "bg-yellow-400";
+                      else if (c.e && c.e.type !== 'fruit' && isVisible(x,y)) col = "bg-red-600";
+                      else if (c.t==='stairs') col = "bg-yellow-400 shadow-[0_0_5px_gold]";
                       else if (c.t==='wall') col = "bg-slate-700";
                       else col = "bg-slate-900";
                     }
@@ -304,21 +306,27 @@
                   }))}
                 </div>
               </div>
+              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 text-[10px] uppercase font-black text-slate-500 text-center italic tracking-widest">Andar {floor}</div>
             </div>
           </div>
+
+          {/* LEVEL UP */}
           {p.sp > 0 && (
-            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
-              <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2>
-                <button onClick={()=>{ setP(v=>({...v, max:v.max+15, hp:v.hp+15, sp:v.sp-1})); }} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs transition-all">Vida (+15 HP)</button>
-                <button onClick={()=>{ setP(v=>({...v, atk:v.atk+3, sp:v.sp-1})); }} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs transition-all">Força (+3 ATK)</button>
+            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-6">
+              <div className="bg-slate-900 border-2 border-red-600 p-10 rounded-[40px] text-center max-w-sm w-full shadow-2xl">
+                <h2 className="text-3xl text-red-500 font-black mb-8 uppercase italic tracking-tighter">Evolução</h2>
+                <button onClick={()=>{ setP(v=>({...v, max:v.max+20, hp:v.hp+20, sp:v.sp-1})); }} className="w-full mb-4 bg-red-900/20 border-2 border-red-600 text-red-500 py-5 rounded-3xl hover:bg-red-600 hover:text-white font-black uppercase text-sm transition-all">Sangue (+20 HP)</button>
+                <button onClick={()=>{ setP(v=>({...v, atk:v.atk+4, sp:v.sp-1})); }} className="w-full bg-slate-800 border-2 border-slate-700 text-slate-300 py-5 rounded-3xl hover:bg-slate-200 hover:text-black font-black uppercase text-sm transition-all">Força (+4 ATK)</button>
               </div>
             </div>
           )}
+
+          {/* DEATH */}
           {isDead && (
-            <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center">
-              <h2 className="text-7xl text-red-800 font-black mb-4 uppercase italic">Caiu</h2>
-              <button onClick={() => start(charClass)} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600 shadow-lg uppercase">Assumir Herança</button>
+            <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[200] p-6 text-center">
+              <h2 className="text-8xl text-red-800 font-black mb-4 uppercase italic tracking-tighter">Caiu</h2>
+              <p className="text-slate-500 mb-10 text-xl font-bold">Andar {floor} foi o seu fim.</p>
+              <button onClick={() => start(charClass)} className="px-16 py-6 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-4 border-red-600 shadow-2xl uppercase tracking-widest text-xl">Assumir Herança</button>
             </div>
           )}
         </div>

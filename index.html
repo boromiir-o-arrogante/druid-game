@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Fixed Movement</title>
+  <title>Lost in Blackwood - Experience Edition</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -11,6 +11,7 @@
   <style>
     body { margin: 0; background-color: #020617; color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
     .hp-gradient { background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%); transition: width 0.5s ease; }
+    .xp-gradient { background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); transition: width 0.5s ease; }
     .lvl-1 { border-color: #64748b; color: #f1f5f9; }
     .lvl-2 { border-color: #22c55e; color: #bbf7d0; box-shadow: 0 0 5px #22c55e; }
     .lvl-3 { border-color: #3b82f6; color: #bfdbfe; box-shadow: 0 0 8px #3b82f6; }
@@ -38,10 +39,10 @@
 
     const MAP_W = 24; const MAP_H = 14; 
     const ENEMY_TYPES = [
-      { type: 'bat', hp: 5, xp: 2, dmg: 2, name: 'Morcego' },
-      { type: 'slime', hp: 8, xp: 3, dmg: 3, name: 'Slime' },
-      { type: 'goblin', hp: 14, xp: 5, dmg: 4, name: 'Goblin' },
-      { type: 'orc', hp: 25, xp: 10, dmg: 6, name: 'Orc' }
+      { type: 'bat', hp: 5, xp: 3, dmg: 2, name: 'Morcego' },
+      { type: 'slime', hp: 8, xp: 5, dmg: 3, name: 'Slime' },
+      { type: 'goblin', hp: 14, xp: 8, dmg: 4, name: 'Goblin' },
+      { type: 'orc', hp: 25, xp: 12, dmg: 6, name: 'Orc' }
     ];
 
     const generateMap = (floor) => {
@@ -54,6 +55,11 @@
         }
         map.push(row);
       }
+      // MAIS FRUTAS (4% chance)
+      map.forEach(r => r.forEach(c => {
+        if (c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' };
+      }));
+
       if (Math.random() < 0.20) {
         let bx = Math.floor(Math.random() * 8) + 12, by = Math.floor(Math.random() * 8) + 3;
         if(map[by][bx].t === 'floor') map[by][bx].e = { type: 'boss', hp: 50 + (floor * 20), dmg: 6 + floor, xp: 50, name: 'ANCIÃO' };
@@ -71,9 +77,9 @@
 
     function App() {
       const [floor, setFloor] = useState(1);
-      const [p, setP] = useState({ x: 2, y: 2, hp: 30, max: 30, atk: 5, range: 1, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
+      const [p, setP] = useState({ x: 2, y: 2, hp: 35, max: 35, atk: 5, range: 1, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
       const [map, setMap] = useState(() => generateMap(1));
-      const [log, setLog] = useState(["Blackwood: Use WASD para explorar."]);
+      const [log, setLog] = useState(["Blackwood: Coma maçãs 🍎 para sobreviver."]);
       const [inventory, setInventory] = useState([]); 
       const [pendingPowerUp, setPendingPowerUp] = useState(null); 
       const [offeredPowerUps, setOfferedPowerUps] = useState([]); 
@@ -147,7 +153,11 @@
             setP(prev => {
               let nextXp = prev.xp + targetEnemy.data.xp;
               let nextLvl = prev.lvl, nextSp = prev.sp;
-              if (nextXp >= prev.lvl * 15) { nextXp = 0; nextLvl++; nextSp++; }
+              if (nextXp >= prev.lvl * 15) { 
+                nextXp -= prev.lvl * 15; 
+                nextLvl++; 
+                nextSp++; 
+              }
               return { ...prev, xp: nextXp, lvl: nextLvl, sp: nextSp };
             });
           }
@@ -162,8 +172,8 @@
         let currentLog = [];
         if (target.e?.type === 'fruit') {
           target.e = null;
-          currentLog.push("🍎 Maçã! (+8 HP)");
-          setP(prev => ({ ...prev, x: nx, y: ny, f: nf, hp: Math.min(prev.max, prev.hp + 8) }));
+          currentLog.push("🍎 Maçã! (+10 HP)");
+          setP(prev => ({ ...prev, x: nx, y: ny, f: nf, hp: Math.min(prev.max, prev.hp + 10) }));
         } else {
           setP(prev => ({ ...prev, x: nx, y: ny, f: nf }));
         }
@@ -208,15 +218,6 @@
         setLog(prev => [...currentLog, ...prev].slice(0, 6));
       };
 
-      useEffect(() => {
-        const h = (e) => {
-          const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
-          if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
-        };
-        window.addEventListener('keydown', h);
-        return () => window.removeEventListener('keydown', h);
-      }, [p, map, inventory, offeredPowerUps, pendingPowerUp]);
-
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-4 font-mono">
           <header className="mb-4 text-center">
@@ -248,14 +249,23 @@
 
             <div className="w-full xl:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
-                <div className="flex justify-between items-center mb-2 text-xs font-bold">
-                  <span className="text-red-500 italic">ANDAR {floor}</span>
-                  <span className="text-white">LV {p.lvl}</span>
+                <div className="flex justify-between items-center mb-1 text-[10px] font-bold">
+                  <span className="text-red-500 italic uppercase">Integridade</span>
+                  <span className="text-slate-300">{p.hp} / {p.max}</span>
                 </div>
-                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-2">
+                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-3 shadow-inner">
                   <div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase text-slate-400">
+
+                <div className="flex justify-between items-center mb-1 text-[10px] font-bold">
+                  <span className="text-blue-500 italic uppercase">Experiência</span>
+                  <span className="text-slate-300">NV {p.lvl}</span>
+                </div>
+                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner">
+                  <div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp / (p.lvl * 15)) * 100}%`}}></div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-4 text-[9px] font-bold uppercase text-slate-400">
                   <div className="bg-black/40 p-1 border border-slate-800 text-center">ATK: {p.atk}</div>
                   <div className="bg-black/40 p-1 border border-slate-800 text-center">RNG: {p.range}</div>
                 </div>
@@ -277,7 +287,7 @@
                 </div>
               </div>
 
-              <div className="bg-black/60 p-3 rounded-xl border border-slate-800 h-28 overflow-hidden text-[10px] italic">
+              <div className="bg-black/60 p-3 rounded-xl border border-slate-800 h-24 overflow-hidden text-[10px] italic">
                 {log.map((m, i) => <div key={i} className={i===0?"text-red-400 font-bold":"text-slate-500"}>{m}</div>)}
               </div>
             </div>
@@ -299,23 +309,6 @@
                       </button>
                     );
                   })}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {pendingPowerUp && (
-            <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[60] p-4">
-              <div className="bg-slate-900 border-2 border-red-500 p-8 rounded-3xl text-center max-w-sm w-full">
-                <h2 className="text-xl text-red-500 font-black mb-4 uppercase italic">Limiar de Poder</h2>
-                <div className="flex flex-col gap-3">
-                  {inventory.map(item => (
-                    <button key={item.id} onClick={() => { setInventory(prev => prev.filter(i => i.id !== item.id)); applyPowerUp(pendingPowerUp); }} 
-                      className="bg-slate-950 border border-slate-800 p-4 rounded-xl flex items-center justify-between hover:bg-red-950 transition-colors">
-                      <span className="text-2xl">{POWER_UPS_CATALOG.find(d=>d.id===item.id).icon}</span>
-                      <span className="text-[10px] font-bold uppercase text-slate-200 ml-4">Descartar {POWER_UPS_CATALOG.find(d=>d.id===item.id).name}</span>
-                    </button>
-                  ))}
                 </div>
               </div>
             </div>

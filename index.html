@@ -28,9 +28,9 @@
     const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", stairs: "🪜", fruit: "🍎", boss: "👿" };
     
     const CLASSES = [
-      { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 40, max: 40, atk: 5, range: 2, vis: 8, def: 0 } },
-      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 65, max: 65, atk: 6, range: 1, vis: 5, def: 2 } },
-      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 35, max: 35, atk: 10, range: 1, vis: 6, def: 0 } }
+      { id: 'exp', name: 'Explorador', icon: '👦', stats: { hp: 45, max: 45, atk: 5, range: 2, vis: 8, def: 0 } },
+      { id: 'war', name: 'Guerreiro', icon: '🛡️', stats: { hp: 70, max: 70, atk: 6, range: 1, vis: 5, def: 2 } },
+      { id: 'hun', name: 'Caçador', icon: '🏹', stats: { hp: 35, max: 35, atk: 11, range: 1, vis: 6, def: 0 } }
     ];
 
     const POWER_CATALOG = [
@@ -64,9 +64,8 @@
         map.push(row);
       }
       map[sPos.y][sPos.x].t = 'stairs';
-      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.04 && c.x > 3 && c.t !== 'stairs') c.e = { type: 'fruit' }; }));
+      map.forEach(r => r.forEach(c => { if(c.t === 'floor' && Math.random() < 0.05 && c.x > 3 && c.t !== 'stairs') c.e = { type: 'fruit' }; }));
       
-      // Spawn de monstros
       for (let i = 0; i < 6 + (floor * 2); i++) {
         let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
         if (map[ry][rx].t === 'floor' && !map[ry][rx].e && (Math.abs(rx - pStart.x) > 4)) {
@@ -75,6 +74,13 @@
           map[ry][rx].e = { ...base, hp: hp, maxHp: hp, dmg: base.dmg + Math.floor(floor * 1.5) };
         }
       }
+
+      if (Math.random() < 0.3) {
+        let bx = 12, by = 6;
+        const bHp = 100 + (floor * 30);
+        map[by][bx].e = { type: 'boss', hp: bHp, maxHp: bHp, dmg: 10 + floor, xp: 150, name: 'GUARDIÃO' };
+      }
+
       return map;
     };
 
@@ -89,21 +95,17 @@
       const [isDead, setIsDead] = useState(false);
       const [legacyData, setLegacyData] = useState({ hp: null, atk: null, powers: [] });
 
-      // Carregar apenas os dados visuais da herança no início
       useEffect(() => {
         const savedP = localStorage.getItem('eternal_player');
         const savedPowers = localStorage.getItem('eternal_powers');
         if (savedP) {
           const parsed = JSON.parse(savedP);
-          setLegacyData({
-            hp: parsed.max,
-            atk: parsed.atk,
-            powers: savedPowers ? JSON.parse(savedPowers) : []
-          });
+          setLegacyData({ hp: parsed.max, atk: parsed.atk, powers: savedPowers ? JSON.parse(savedPowers) : [] });
         }
       }, []);
 
       const saveProgress = (player, powers, cClass) => {
+        if (!player) return;
         localStorage.setItem('eternal_player', JSON.stringify({...player, hp: player.max}));
         localStorage.setItem('eternal_powers', JSON.stringify(powers));
         localStorage.setItem('eternal_class', JSON.stringify(cClass));
@@ -112,22 +114,22 @@
       const start = (selectedClass) => {
         const savedP = localStorage.getItem('eternal_player');
         const savedPowers = localStorage.getItem('eternal_powers');
-        
         let initialP;
         let initialPowers = [];
-
         if (savedP && savedPowers) {
-          initialP = { ...JSON.parse(savedP), x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' };
+          const parsed = JSON.parse(savedP);
+          initialP = { ...parsed, hp: parsed.max, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' };
           initialPowers = JSON.parse(savedPowers);
         } else {
           initialP = { ...selectedClass.stats, x: 2, y: 2, xp: 0, lvl: 1, sp: 0, f: 'DOWN' };
         }
-
         setCharClass(selectedClass);
         setP(initialP);
         setActivePowers(initialPowers);
         setMap(generateLevel(1));
         setFloor(1);
+        setIsDead(false);
+        setInventory([]);
         saveProgress(initialP, initialPowers, selectedClass);
       };
 
@@ -143,7 +145,6 @@
         const exists = newPowers.find(i => i.id === pu.id);
         if (exists) exists.lvl = Math.min(5, exists.lvl + 1);
         else newPowers.push({ id: pu.id, lvl: 1 });
-        
         setActivePowers(newPowers);
         let updatedP = { ...p };
         if (pu.id === 'atk_dmg') updatedP.atk += 2;
@@ -187,7 +188,7 @@
           else setP(v => ({...v, f: nf}));
           if (targetEnemy.e.hp <= 0) {
             let nXp = p.xp + targetEnemy.e.xp;
-            if (nXp >= p.lvl * 30) { nXp -= (p.lvl * 30); setP(v => ({...v, xp: nXp, lvl: v.lvl + 1, sp: v.sp + 1, f: nf})); }
+            if (nXp >= p.lvl * 40) { nXp -= (p.lvl * 40); setP(v => ({...v, xp: nXp, lvl: v.lvl + 1, sp: v.sp + 1, f: nf})); }
             else { setP(v => ({...v, xp: nXp, f: nf})); }
             map[targetEnemy.y][targetEnemy.x].e = null;
           }
@@ -209,7 +210,7 @@
         }
         if (cell.e?.type === 'fruit') {
           if (inventory.length < 3) setInventory(v => [...v, 'apple']);
-          else setP(v => ({...v, hp: Math.min(v.max, v.hp + 12)}));
+          else setP(v => ({...v, hp: Math.min(v.max, v.hp + 15)}));
           cell.e = null;
         }
         setP(v => ({...v, x: nx, y: ny, f: nf}));
@@ -227,7 +228,7 @@
               let hit = Math.max(1, c.e.dmg - (p.def + resPower));
               dmgTaken += hit;
               if (rflPower > 0) { c.e.hp -= Math.floor(hit * (0.2 * rflPower)); if (c.e.hp <= 0) return { ...c, e: null }; }
-            } else {
+            } else if (Math.random() > 0.4) {
               const sx = c.x + (px > c.x ? 1 : px < c.x ? -1 : 0), sy = c.y + (py > c.y ? 1 : py < c.y ? -1 : 0);
               if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === px && sy === py)) 
                 return { ...c, e: null, next: { ...c.e, nx: sx, ny: sy } };
@@ -257,37 +258,32 @@
       if (!charClass) return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-6 text-center">
           <h1 className="text-5xl font-black text-red-600 mb-2 italic tracking-tighter uppercase">Lost in Blackwood</h1>
-          
           <div className="mb-8 p-4 bg-slate-900/50 border border-slate-800 rounded-2xl max-w-md w-full">
-            <h2 className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-3">Memória da Linhagem</h2>
+            <h2 className="text-xs uppercase tracking-widest text-slate-500 font-bold mb-3">Herança Salva</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="text-left bg-black/40 p-3 rounded-xl border border-red-900/30">
-                 <p className="text-[10px] text-red-500 font-bold uppercase">Herança</p>
+                 <p className="text-[10px] text-red-500 font-bold uppercase">Atributos</p>
                  <p className="text-sm font-black">❤️ HP: {legacyData.hp || '--'}</p>
                  <p className="text-sm font-black">⚔️ ATK: {legacyData.atk || '--'}</p>
               </div>
               <div className="text-left bg-black/40 p-3 rounded-xl border border-blue-900/30">
-                 <p className="text-[10px] text-blue-500 font-bold uppercase">Poderes</p>
+                 <p className="text-[10px] text-blue-500 font-bold uppercase">Bônus Ativos</p>
                  <div className="flex flex-wrap gap-1 mt-1">
-                   {legacyData.powers.length > 0 ? legacyData.powers.map(pow => <span key={pow.id}>{POWER_CATALOG.find(x=>x.id===pow.id).icon}</span>) : <span className="text-[10px] text-slate-600">Vazio</span>}
+                   {legacyData.powers.length > 0 ? legacyData.powers.map(pow => <span key={pow.id}>{POWER_CATALOG.find(x=>x.id===pow.id).icon}</span>) : <span className="text-[10px] text-slate-600">Nenhum</span>}
                  </div>
               </div>
             </div>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
             {CLASSES.map(c => (
               <button key={c.id} onClick={() => start(c)} className="bg-slate-900 border-2 border-slate-800 p-6 rounded-3xl hover:border-red-600 transition-all group">
                 <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">{c.icon}</div>
                 <h3 className="text-xl font-bold mb-1 uppercase">{c.name}</h3>
-                <div className="text-[9px] text-slate-500 font-bold uppercase">Começar Jornada</div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase">Renascido de Sangue</div>
               </button>
             ))}
           </div>
-
-          <button onClick={resetGame} className="mt-12 text-[10px] uppercase font-bold text-red-900 hover:text-red-500 transition-colors border-b border-red-900/30 pb-1">
-            Apagar Linhagem e Recomeçar
-          </button>
+          <button onClick={resetGame} className="mt-12 text-[10px] uppercase font-bold text-red-900 hover:text-red-500 transition-colors border-b border-red-900/30 pb-1">Resetar Linhagem Eterna</button>
         </div>
       );
 
@@ -303,7 +299,7 @@
                     if (vis) { char = p.x===x && p.y===y ? charClass.icon : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
                     else if (c.v) { char = EMOJIS[c.t]; op="opacity-10"; }
                     return (
-                      <div key={x} className="relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl">
+                      <div key={x} className={`relative w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl`}>
                         <div className={op}>{char}</div>
                         {c.e && vis && c.e.hp < c.e.maxHp && <div className="absolute -top-1 w-7 h-1 bg-black rounded-full overflow-hidden border border-slate-800"><div className="h-full bg-red-600" style={{width:`${(c.e.hp/c.e.maxHp)*100}%`}}></div></div>}
                       </div>
@@ -312,23 +308,21 @@
                 </div>
               ))}
             </div>
-
             <div className="w-full lg:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl font-bold text-[10px]">
-                <div className="flex justify-between text-red-500 uppercase mb-1"><span>Vida</span><span>{p.hp}/{p.max}</span></div>
+                <div className="flex justify-between text-red-500 uppercase mb-1 italic"><span>Vida Eterna</span><span>Andar {floor}</span></div>
                 <div className="w-full bg-black h-3 rounded-full overflow-hidden border border-slate-800 p-0.5 mb-4 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
                 <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 text-center mb-4">
                    <p className="text-emerald-400 mb-1 text-[8px] uppercase tracking-widest">Mochila: {inventory.length}/3</p>
                    <div className="flex justify-center gap-1 mb-1">{inventory.map((_,i)=><span key={i}>🍎</span>)}</div>
-                   <p className="text-white text-[8px] animate-pulse">PRESS [H] PARA CURAR</p>
+                   <p className="text-white text-[8px] animate-pulse uppercase">Aperte [H] para curar</p>
                 </div>
-                <div className="flex justify-between text-blue-500 uppercase mb-1"><span>NV {p.lvl}</span><span>{Math.floor(p.xp)}/{p.lvl*30}</span></div>
-                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*30))*100}%`}}></div></div>
+                <div className="flex justify-between text-blue-500 uppercase mb-1"><span>NV {p.lvl}</span><span>{Math.floor(p.xp)}/{p.lvl*40}</span></div>
+                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp/(p.lvl*40))*100}%`}}></div></div>
                 <div className="flex flex-wrap gap-1 mt-4">
                    {activePowers.map(i => <div key={i.id} className={`lvl-border border px-1 rounded text-[8px] bg-black/40 lvl-${i.lvl}`}>{POWER_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
                 </div>
               </div>
-
               <div className="minimap-bg flex justify-center">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
                   {map.map((row, y) => row.map((c, x) => {
@@ -346,7 +340,6 @@
               </div>
             </div>
           </div>
-
           {offered.length > 0 && (
             <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
               <div className="bg-slate-900 border-2 border-emerald-500 p-6 rounded-3xl text-center max-w-xl w-full">
@@ -357,17 +350,15 @@
               </div>
             </div>
           )}
-
           {p && p.sp > 0 && offered.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
               <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-3xl text-center max-w-xs w-full shadow-2xl">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic text-center">Evolução</h2>
+                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2>
                 <button onClick={()=>{ const updated = {...p, max:p.max+10, hp:p.max+10, sp:p.sp-1}; setP(updated); saveProgress(updated, activePowers, charClass); }} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-2xl hover:bg-red-600 hover:text-white font-bold uppercase text-xs">Aprimorar Vida (+10 HP)</button>
                 <button onClick={()=>{ const updated = {...p, atk:p.atk+3, sp:p.sp-1}; setP(updated); saveProgress(updated, activePowers, charClass); }} className="w-full bg-slate-800 border border-slate-700 text-slate-300 py-4 rounded-2xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aprimorar Força (+3 ATK)</button>
               </div>
             </div>
           )}
-
           {isDead && (
             <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6 text-center">
               <h2 className="text-7xl text-red-800 font-black mb-4 uppercase italic">Caiu</h2>
@@ -377,8 +368,9 @@
                     <span>❤️ {p.max} HP</span>
                     <span>⚔️ {p.atk} ATK</span>
                  </div>
+                 <p className="text-[10px] text-slate-600 italic">Esses valores serão a base da sua próxima vida.</p>
               </div>
-              <button onClick={() => { setIsDead(false); setFloor(1); setMap(generateLevel(1)); setInventory([]); }} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600 shadow-lg uppercase tracking-widest">Assumir Herança</button>
+              <button onClick={() => start(charClass)} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full border-2 border-red-600 shadow-lg uppercase tracking-widest">Assumir Herança</button>
             </div>
           )}
         </div>

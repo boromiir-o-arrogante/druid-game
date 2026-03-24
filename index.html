@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lost in Blackwood - Experience Edition</title>
+  <title>Lost in Blackwood - Final Fix</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -27,7 +27,6 @@
     const { useState, useEffect, useCallback } = React;
 
     const EMOJIS = { wall: "🌲", floor: "·", player: "👦", goblin: "👹", slime: "🦠", orc: "🧌", bat: "🦇", fog: "⬛", stairs: "🪜", fruit: "🍎", boss: "👿" };
-    
     const POWER_UPS_CATALOG = [
       { id: 'atk_dmg', name: 'Força Bruta', icon: '⚔️', desc: '+2 Dano Base' },
       { id: 'atk_rng', name: 'Alcance', icon: '🏹', desc: '+1 Distância Atq' },
@@ -39,34 +38,33 @@
 
     const MAP_W = 24; const MAP_H = 14; 
     const ENEMY_TYPES = [
-      { type: 'bat', hp: 5, xp: 3, dmg: 2, name: 'Morcego' },
-      { type: 'slime', hp: 8, xp: 5, dmg: 3, name: 'Slime' },
-      { type: 'goblin', hp: 14, xp: 8, dmg: 4, name: 'Goblin' },
-      { type: 'orc', hp: 25, xp: 12, dmg: 6, name: 'Orc' }
+      { type: 'bat', hp: 5, xp: 4, dmg: 2, name: 'Morcego' },
+      { type: 'slime', hp: 8, xp: 6, dmg: 3, name: 'Slime' },
+      { type: 'goblin', hp: 14, xp: 10, dmg: 4, name: 'Goblin' },
+      { type: 'orc', hp: 25, xp: 15, dmg: 6, name: 'Orc' }
     ];
 
-    const generateMap = (floor) => {
+    const generateLevelMap = (floor) => {
       let map = [];
       for (let y = 0; y < MAP_H; y++) {
         let row = [];
         for (let x = 0; x < MAP_W; x++) {
-          const isWall = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1 || (Math.random() < 0.17 && x > 4);
+          const isBorder = x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1;
+          const isWall = isBorder || (Math.random() < 0.17 && x > 4);
           row.push({ x, y, t: isWall ? 'wall' : 'floor', e: null, v: false });
         }
         map.push(row);
       }
-      // MAIS FRUTAS (4% chance)
       map.forEach(r => r.forEach(c => {
         if (c.t === 'floor' && Math.random() < 0.04) c.e = { type: 'fruit' };
       }));
-
       if (Math.random() < 0.20) {
         let bx = Math.floor(Math.random() * 8) + 12, by = Math.floor(Math.random() * 8) + 3;
-        if(map[by][bx].t === 'floor') map[by][bx].e = { type: 'boss', hp: 50 + (floor * 20), dmg: 6 + floor, xp: 50, name: 'ANCIÃO' };
+        if(map[by]?.[bx]?.t === 'floor') map[by][bx].e = { type: 'boss', hp: 50 + (floor * 20), dmg: 6 + floor, xp: 50, name: 'ANCIÃO' };
       }
       for (let i = 0; i < 6 + floor; i++) {
         let rx = Math.floor(Math.random() * (MAP_W-2)) + 1, ry = Math.floor(Math.random() * (MAP_H-2)) + 1;
-        if (map[ry][rx].t === 'floor' && !map[ry][rx].e) {
+        if (map[ry]?.[rx]?.t === 'floor' && !map[ry][rx].e) {
           const base = ENEMY_TYPES[Math.floor(Math.random() * Math.min(floor, 4))];
           map[ry][rx].e = { ...base, hp: base.hp + (floor * 2), dmg: base.dmg + Math.floor(floor/2) };
         }
@@ -78,8 +76,8 @@
     function App() {
       const [floor, setFloor] = useState(1);
       const [p, setP] = useState({ x: 2, y: 2, hp: 35, max: 35, atk: 5, range: 1, f: 'DOWN', xp: 0, lvl: 1, sp: 0 });
-      const [map, setMap] = useState(() => generateMap(1));
-      const [log, setLog] = useState(["Blackwood: Coma maçãs 🍎 para sobreviver."]);
+      const [map, setMap] = useState(() => generateLevelMap(1));
+      const [log, setLog] = useState(["Blackwood: Mova-se para explorar."]);
       const [inventory, setInventory] = useState([]); 
       const [pendingPowerUp, setPendingPowerUp] = useState(null); 
       const [offeredPowerUps, setOfferedPowerUps] = useState([]); 
@@ -117,13 +115,10 @@
         const nextF = floor + 1;
         setFloor(nextF);
         const regItem = inventory.find(i => i.id === 'hp_reg');
-        if (regItem) {
-          setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + Math.floor(prev.max * (0.05 * regItem.lvl))) }));
-        }
-        setMap(generateMap(nextF));
+        if (regItem) setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + Math.floor(prev.max * (0.05 * regItem.lvl))) }));
+        setMap(generateLevelMap(nextF));
         setP(prev => ({ ...prev, x: 2, y: 2 }));
-        const shuffled = [...POWER_UPS_CATALOG].sort(() => 0.5 - Math.random());
-        setOfferedPowerUps(shuffled.slice(0, 3));
+        setOfferedPowerUps([...POWER_UPS_CATALOG].sort(() => 0.5 - Math.random()).slice(0, 3));
       }, [floor, inventory]);
 
       const move = (dx, dy) => {
@@ -134,15 +129,17 @@
         let targetEnemy = null;
         for (let r = 1; r <= p.range; r++) {
           let tx = p.x + (dx * r), ty = p.y + (dy * r);
-          if (map[ty]?.[tx]?.e && !['fruit', 'player'].includes(map[ty][tx].e.type)) {
-            targetEnemy = { x: tx, y: ty, data: map[ty][tx].e };
-            break;
+          if (ty >= 0 && ty < MAP_H && tx >= 0 && tx < MAP_W) {
+            if (map[ty][tx].e && !['fruit', 'player'].includes(map[ty][tx].e.type)) {
+              targetEnemy = { x: tx, y: ty, data: map[ty][tx].e };
+              break;
+            }
+            if (map[ty][tx].t === 'wall') break;
           }
-          if (map[ty]?.[tx]?.t === 'wall') break;
         }
 
         if (targetEnemy) {
-          let newLog = [`Acertou ${targetEnemy.data.name}!`];
+          let currentLog = [`Ataque no ${targetEnemy.data.name}!`];
           targetEnemy.data.hp -= p.atk;
           const leach = inventory.find(i => i.id === 'atk_lch');
           if (leach) setP(prev => ({ ...prev, hp: Math.min(prev.max, prev.hp + leach.lvl), f: nf }));
@@ -151,56 +148,49 @@
           if (targetEnemy.data.hp <= 0) {
             map[targetEnemy.y][targetEnemy.x].e = null;
             setP(prev => {
-              let nextXp = prev.xp + targetEnemy.data.xp;
-              let nextLvl = prev.lvl, nextSp = prev.sp;
-              if (nextXp >= prev.lvl * 15) { 
-                nextXp -= prev.lvl * 15; 
-                nextLvl++; 
-                nextSp++; 
-              }
-              return { ...prev, xp: nextXp, lvl: nextLvl, sp: nextSp };
+              let nxp = prev.xp + targetEnemy.data.xp, nlvl = prev.lvl, nsp = prev.sp;
+              if (nxp >= prev.lvl * 15) { nxp -= prev.lvl * 15; nlvl++; nsp++; }
+              return { ...prev, xp: nxp, lvl: nlvl, sp: nsp };
             });
+            currentLog.push("Inimigo abatido!");
           }
-          processEnemyTurn(newLog);
+          processTurn(currentLog);
           return;
         }
 
-        const target = map[ny]?.[nx];
-        if (!target || target.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
-        if (target.t === 'stairs') { nextFloor(); return; }
-
-        let currentLog = [];
-        if (target.e?.type === 'fruit') {
-          target.e = null;
-          currentLog.push("🍎 Maçã! (+10 HP)");
-          setP(prev => ({ ...prev, x: nx, y: ny, f: nf, hp: Math.min(prev.max, prev.hp + 10) }));
-        } else {
-          setP(prev => ({ ...prev, x: nx, y: ny, f: nf }));
+        if (ny >= 0 && ny < MAP_H && nx >= 0 && nx < MAP_W) {
+          const target = map[ny][nx];
+          if (target.t === 'wall') { setP(prev => ({...prev, f: nf})); return; }
+          if (target.t === 'stairs') { nextFloor(); return; }
+          let currentLog = [];
+          if (target.e?.type === 'fruit') {
+            target.e = null;
+            currentLog.push("🍎 Maçã! (+10 HP)");
+            setP(prev => ({ ...prev, x: nx, y: ny, f: nf, hp: Math.min(prev.max, prev.hp + 10) }));
+          } else {
+            setP(prev => ({ ...prev, x: nx, y: ny, f: nf }));
+          }
+          processTurn(currentLog, nx, ny);
         }
-        processEnemyTurn(currentLog, nx, ny);
       };
 
-      const processEnemyTurn = (currentLog, px, py) => {
-        const playerX = px !== undefined ? px : p.x;
-        const playerY = py !== undefined ? py : p.y;
-        let damageToPlayer = 0;
-        const resItem = inventory.find(i => i.id === 'def_res');
-        const rflItem = inventory.find(i => i.id === 'def_rfl');
+      const processTurn = (currentLog, px, py) => {
+        const curX = px !== undefined ? px : p.x;
+        const curY = py !== undefined ? py : p.y;
+        let dmgRec = 0;
+        const res = inventory.find(i => i.id === 'def_res');
+        const rfl = inventory.find(i => i.id === 'def_rfl');
 
         const newMap = map.map(row => row.map(cell => {
           if (cell.e && !['player', 'fruit'].includes(cell.e.type)) {
-            let dx = playerX - cell.x, dy = playerY - cell.y;
+            let dx = curX - cell.x, dy = curY - cell.y;
             if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
-              let dmg = Math.max(1, cell.e.dmg - (resItem ? resItem.lvl : 0));
-              damageToPlayer += dmg;
-              if (rflItem) {
-                 cell.e.hp -= Math.floor(dmg * (0.2 * rflItem.lvl));
-                 if (cell.e.hp <= 0) return { ...cell, e: null };
-              }
+              let d = Math.max(1, cell.e.dmg - (res ? res.lvl : 0));
+              dmgRec += d;
+              if (rfl) { cell.e.hp -= Math.floor(d * (0.2 * rfl.lvl)); if (cell.e.hp <= 0) return { ...cell, e: null }; }
             } else if (Math.random() > 0.4) {
-              let sx = cell.x + (dx !== 0 ? dx / Math.abs(dx) : 0);
-              let sy = cell.y + (dy !== 0 ? dy / Math.abs(dy) : 0);
-              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === playerX && sy === playerY)) {
+              let sx = cell.x + (dx !== 0 ? dx / Math.abs(dx) : 0), sy = cell.y + (dy !== 0 ? dy / Math.abs(dy) : 0);
+              if (map[sy]?.[sx]?.t === 'floor' && !map[sy][sx].e && !(sx === curX && sy === curY)) {
                 return { ...cell, e: null, pending: { ...cell.e, nx: sx, ny: sy } };
               }
             }
@@ -208,26 +198,28 @@
           return { ...cell };
         }));
 
-        newMap.forEach(r => r.forEach(c => {
-          if (c.pending) { newMap[c.pending.ny][c.pending.nx].e = { ...c.pending }; delete c.pending; }
-        }));
-
-        if (damageToPlayer > 0) currentLog.push(`💥 Dano: -${damageToPlayer}`);
-        setP(prev => ({ ...prev, hp: prev.hp - damageToPlayer }));
+        newMap.forEach(r => r.forEach(c => { if (c.pending) { newMap[c.pending.ny][c.pending.nx].e = { ...c.pending }; delete c.pending; } }));
+        if (dmgRec > 0) currentLog.push(`💥 Dano: -${dmgRec}`);
+        setP(prev => ({ ...prev, hp: prev.hp - dmgRec }));
         setMap(newMap);
         setLog(prev => [...currentLog, ...prev].slice(0, 6));
       };
+
+      useEffect(() => {
+        const h = (e) => {
+          const k = {w:[0,-1],s:[0,1],a:[-1,0],d:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+          if (k[e.key]) { e.preventDefault(); move(...k[e.key]); }
+        };
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [p, map, inventory, offeredPowerUps, pendingPowerUp]);
 
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 p-4 font-mono">
           <header className="mb-4 text-center">
             <h1 className="text-red-600 text-3xl font-black italic tracking-tighter uppercase">Lost in Blackwood</h1>
             <div className="flex justify-center gap-2 mt-2">
-              {inventory.map(i => (
-                <div key={i.id} className={`lvl-${i.lvl} border-2 px-2 py-1 rounded text-[9px] font-bold bg-slate-900`}>
-                  {POWER_UPS_CATALOG.find(d => d.id === i.id).icon} L{i.lvl}
-                </div>
-              ))}
+              {inventory.map(i => <div key={i.id} className={`lvl-${i.lvl} border-2 px-2 py-0.5 rounded text-[8px] font-bold bg-slate-900`}>{POWER_UPS_CATALOG.find(d=>d.id===i.id).icon} L{i.lvl}</div>)}
             </div>
           </header>
 
@@ -236,12 +228,11 @@
               {map.map((row, y) => (
                 <div key={y} className="flex">
                   {row.map((c, x) => {
-                    const vis = isVisible(x, y, p);
-                    if (vis) c.v = true;
-                    let char = "⬛"; let op = "opacity-0";
-                    if (vis) { char = p.x===x && p.y===y ? EMOJIS.player : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
-                    else if (c.v) { char = EMOJIS[c.t]; op="opacity-10 grayscale"; }
-                    return <div key={x} className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-200 ${op}`}>{char}</div>;
+                    const vis = isVisible(x, y, p); if (vis) c.v = true;
+                    let ch = "⬛"; let op = "opacity-0";
+                    if (vis) { ch = p.x===x && p.y===y ? EMOJIS.player : (c.e ? EMOJIS[c.e.type] : EMOJIS[c.t]); op="opacity-100"; }
+                    else if (c.v) { ch = EMOJIS[c.t]; op="opacity-10 grayscale"; }
+                    return <div key={x} className={`w-8 h-8 md:w-9 md:h-9 flex items-center justify-center text-xl transition-opacity duration-200 ${op}`}>{ch}</div>;
                   })}
                 </div>
               ))}
@@ -249,40 +240,30 @@
 
             <div className="w-full xl:w-72 flex flex-col gap-4">
               <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 shadow-lg">
-                <div className="flex justify-between items-center mb-1 text-[10px] font-bold">
-                  <span className="text-red-500 italic uppercase">Integridade</span>
-                  <span className="text-slate-300">{p.hp} / {p.max}</span>
+                <div className="flex justify-between items-center text-[10px] font-bold mb-1">
+                   <span className="text-red-500 uppercase italic">Integridade</span>
+                   <span>{p.hp}/{p.max}</span>
                 </div>
-                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-3 shadow-inner">
-                  <div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div>
+                <div className="w-full bg-black h-3 rounded-full border border-slate-800 p-0.5 mb-3 shadow-inner"><div className="hp-gradient h-full rounded-full" style={{width:`${Math.max(0,(p.hp/p.max)*100)}%`}}></div></div>
+                <div className="flex justify-between items-center text-[10px] font-bold mb-1">
+                   <span className="text-blue-500 uppercase italic">XP / Nível {p.lvl}</span>
+                   <span>{p.xp}/{p.lvl*15}</span>
                 </div>
-
-                <div className="flex justify-between items-center mb-1 text-[10px] font-bold">
-                  <span className="text-blue-500 italic uppercase">Experiência</span>
-                  <span className="text-slate-300">NV {p.lvl}</span>
-                </div>
-                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner">
-                  <div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp / (p.lvl * 15)) * 100}%`}}></div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-4 text-[9px] font-bold uppercase text-slate-400">
-                  <div className="bg-black/40 p-1 border border-slate-800 text-center">ATK: {p.atk}</div>
-                  <div className="bg-black/40 p-1 border border-slate-800 text-center">RNG: {p.range}</div>
-                </div>
+                <div className="w-full bg-black h-2 rounded-full border border-slate-800 p-0.5 shadow-inner"><div className="xp-gradient h-full rounded-full" style={{width:`${(p.xp / (p.lvl * 15)) * 100}%`}}></div></div>
               </div>
 
               <div className="bg-slate-900 p-2 rounded-xl border border-slate-800 flex justify-center shadow-inner">
                 <div className="grid gap-[1px]" style={{gridTemplateColumns:`repeat(${MAP_W}, 1fr)`}}>
                   {map.map((row, y) => row.map((c, x) => {
-                    let color = "bg-transparent";
+                    let col = "bg-transparent";
                     if (c.v) {
-                      if (p.x===x && p.y===y) color = "bg-emerald-400";
-                      else if (c.e && isVisible(x,y,p)) color = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
-                      else if (c.t==='stairs') color = "bg-amber-400 animate-pulse";
-                      else if (c.t==='wall') color = "bg-slate-800";
-                      else color = "bg-slate-900";
+                      if (p.x===x && p.y===y) col = "bg-emerald-400";
+                      else if (c.e && isVisible(x,y,p)) col = c.e.type==='boss' ? "animate-boss-radar" : "bg-red-600";
+                      else if (c.t==='stairs') col = "bg-amber-400 animate-pulse";
+                      else if (c.t==='wall') col = "bg-slate-800";
+                      else col = "bg-slate-900";
                     }
-                    return <div key={`${x}-${y}`} className={`minimap-pixel ${color}`}></div>;
+                    return <div key={`${x}-${y}`} className={`minimap-pixel ${col}`}></div>;
                   }))}
                 </div>
               </div>
@@ -300,14 +281,7 @@
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                   {offeredPowerUps.map(pu => {
                     const inv = inventory.find(i => i.id === pu.id);
-                    return (
-                      <button key={pu.id} onClick={() => handlePowerUpSelection(pu.id)} className={`bg-slate-950 border-2 p-4 rounded-2xl transition-all hover:scale-105 lvl-${(inv?.lvl||0)+1}`}>
-                        <div className="text-3xl mb-1">{pu.icon}</div>
-                        <div className="font-bold text-xs uppercase">{pu.name}</div>
-                        <div className="text-[8px] text-slate-500 mt-2">{pu.desc}</div>
-                        <div className="text-[8px] font-black mt-2 uppercase">Nível {(inv?.lvl||0)+1}</div>
-                      </button>
-                    );
+                    return <button key={pu.id} onClick={() => handlePowerUpSelection(pu.id)} className={`bg-slate-950 border-2 p-4 rounded-2xl transition-all hover:scale-105 lvl-${(inv?.lvl||0)+1}`}><div className="text-3xl mb-1">{pu.icon}</div><div className="font-bold text-xs uppercase">{pu.name}</div><div className="text-[8px] text-slate-500 mt-2">{pu.desc}</div><div className="text-[8px] font-black mt-2 uppercase">Nível {(inv?.lvl||0)+1}</div></button>;
                   })}
                 </div>
               </div>
@@ -316,20 +290,11 @@
 
           {p.sp > 0 && offeredPowerUps.length === 0 && (
             <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[40]">
-              <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-2xl text-center max-w-xs w-full">
-                <h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2>
-                <button onClick={()=>setP(prev=>({...prev, max:prev.max+10, hp:prev.hp+10, sp:prev.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-xl hover:bg-red-600 font-bold uppercase text-xs">Aumentar HP (+10)</button>
-                <button onClick={()=>setP(prev=>({...prev, atk:prev.atk+3, sp:prev.sp-1}))} className="w-full bg-slate-800 border border-slate-600 text-slate-300 py-4 rounded-xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aumentar Dano (+3)</button>
-              </div>
+              <div className="bg-slate-900 border-2 border-red-600 p-8 rounded-2xl text-center max-w-xs w-full"><h2 className="text-xl text-red-500 font-black mb-6 uppercase italic">Evolução</h2><button onClick={()=>setP(prev=>({...prev, max:prev.max+10, hp:prev.hp+10, sp:prev.sp-1}))} className="w-full mb-4 bg-red-900/20 border border-red-600 text-red-500 py-4 rounded-xl hover:bg-red-600 font-bold uppercase text-xs">Aumentar HP (+10)</button><button onClick={()=>setP(prev=>({...prev, atk:prev.atk+3, sp:prev.sp-1}))} className="w-full bg-slate-800 border border-slate-600 text-slate-300 py-4 rounded-xl hover:bg-slate-200 hover:text-black font-bold uppercase text-xs">Aumentar Dano (+3)</button></div>
             </div>
           )}
 
-          {p.hp <= 0 && (
-            <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6">
-              <h2 className="text-7xl text-red-800 font-black mb-2 uppercase italic">A Floresta Venceu</h2>
-              <button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full uppercase tracking-widest border-2 border-red-600">Reiniciar</button>
-            </div>
-          )}
+          {p.hp <= 0 && <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[100] p-6"><h2 className="text-7xl text-red-800 font-black mb-2 uppercase italic tracking-tighter">Morte</h2><button onClick={()=>window.location.reload()} className="px-12 py-4 bg-red-900 text-white font-black hover:bg-red-700 transition-all rounded-full uppercase tracking-widest border-2 border-red-600">Reiniciar</button></div>}
         </div>
       );
     }

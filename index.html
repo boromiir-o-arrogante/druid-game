@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Lost in Blackwood - Zelda Aesthetic</title>
+  <title>Lost in Blackwood - Detailed Zelda Aesthetic</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
@@ -15,31 +15,36 @@
 
   <style>
     /* ==========================================================================
-       1. TEMA GLOBAL (ZELDA VIBE)
+       1. TEMA GLOBAL E ADAPTABILIDADE
        ========================================================================== */
     body { 
       margin: 0; background-color: #0b101a; color: #f8fafc; 
-      font-family: 'VT323', monospace; overflow: hidden; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+      font-family: 'VT323', monospace; overflow: hidden; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
     }
-    #scale-wrapper { 
-      transition: transform 0.2s ease-out; transform-origin: center center; 
+    
+    /* Configuração do contêiner responsivo */
+    #responsive-game-container {
+      width: 90vw; height: 90vh; /* Ocupa 90% da janela */
+      display: flex; align-items: center; justify-content: center;
       image-rendering: pixelated; 
     }
 
+    #scale-wrapper {
+      transform-origin: center center;
+    }
+
     /* ==========================================================================
-       2. INTERFACE CLÁSSICA (PAINÉIS JRPG)
+       2. INTERFACE CLÁSSICA (PAINÉIS JRPG DETALHADOS)
        ========================================================================== */
     .zelda-panel {
-      background-color: rgba(10, 15, 30, 0.9);
-      border: 4px solid #fcd34d; /* Dourado claro */
-      border-radius: 8px;
-      box-shadow: inset 0 0 0 2px #b45309, 0 0 0 4px #000, 6px 6px 0px rgba(0,0,0,0.6);
+      background-color: rgba(10, 15, 30, 0.95);
+      border: 4px solid #fcd34d; border-radius: 8px;
+      box-shadow: inset 0 0 0 2px #b45309, 0 0 0 4px #000, 8px 8px 0px rgba(0,0,0,0.6);
       color: #fff;
     }
     .zelda-panel-dark {
-      background-color: rgba(0, 0, 0, 0.85);
-      border: 2px solid #f8fafc;
-      border-radius: 6px;
+      background-color: rgba(0, 0, 0, 0.9);
+      border: 2px solid #f8fafc; border-radius: 6px;
       box-shadow: inset 0 0 0 2px #475569, 0 0 0 2px #000;
     }
     
@@ -52,84 +57,85 @@
     @keyframes flashAnim { 0% { background-color: rgba(251, 191, 36, 0.7); } 50% { background-color: transparent; } 100% { background-color: transparent; } }
 
     /* ==========================================================================
-       3. O MAPA E O CENÁRIO (PIXEL ART ZELDA)
+       3. O MAPA E O CENÁRIO (PIXEL ART ZELDA DETALHADO)
        ========================================================================== */
     .map-container {
-      background-color: #0f172a; border: 4px solid #fcd34d; border-radius: 6px;
-      box-shadow: inset 0 0 0 4px #b45309, 0 0 0 4px #000, 10px 10px 0px rgba(0,0,0,0.6);
+      background-color: #0f172a; border: 6px solid #fcd34d; border-radius: 8px;
+      box-shadow: inset 0 0 0 4px #b45309, 0 0 0 4px #000, 12px 12px 0px rgba(0,0,0,0.6);
     }
     .tile { width: 40px; height: 40px; position: relative; display: flex; align-items: center; justify-content: center; }
     
-    /* Chão de Grama Viva (Estilo ALttP) */
+    /* Chão de Grama Viva Texturizada */
     .tile-grass { 
-      background-color: #78c038; 
+      background-color: #6da632; 
       background-image: 
-        radial-gradient(#5a962a 15%, transparent 16%), 
-        radial-gradient(#6da632 15%, transparent 16%);
+        radial-gradient(#4d7522 15%, transparent 16%), 
+        radial-gradient(#5a962a 15%, transparent 16%);
       background-size: 16px 16px; background-position: 0 0, 8px 8px;
     }
     
-    /* Árvores Arredondadas (Estilo Zelda) */
-    .tile-tree { background-color: #78c038; position: relative; overflow: visible; z-index: 5; }
-    .tile-tree::before { /* Tronco Marrom Vivo */
-      content: ''; position: absolute; bottom: 2px; left: 14px; width: 12px; height: 14px; 
+    /* Árvores Pinheiro Arredondadas */
+    .tile-tree { background-color: #6da632; position: relative; overflow: visible; z-index: 5; }
+    .tile-tree::before { /* Tronco Marrom */
+      content: ''; position: absolute; bottom: 2px; left: 14px; width: 12px; height: 16px; 
       background: #8b5a2b; border: 2px solid #3e2723; border-bottom: none; z-index: 1;
     }
-    .tile-tree::after { /* Copa Redonda */
-      content: ''; position: absolute; bottom: 12px; left: -4px; width: 48px; height: 44px; 
+    .tile-tree::after { /* Copa Redonda Pinheiro */
+      content: ''; position: absolute; bottom: 12px; left: -6px; width: 52px; height: 50px; 
       background: #1b5e20; border: 2px solid #003300; border-radius: 50%;
-      box-shadow: inset -6px -6px 0 #144016, inset 6px 6px 0 #2e7d32; z-index: 2; 
+      box-shadow: inset -6px -6px 0 #144016, inset 6px 6px 0 #2e7d32, 0 4px 0 rgba(0,0,0,0.3); z-index: 2; 
     }
 
-    /* Escada (Caverna de Pedra) */
-    .tile-stairs { background: #78c038; }
+    /* Entrada de Caverna (Porta) */
+    .tile-stairs { background: #6da632; }
     .stairs-door { 
-      width: 32px; height: 32px; background: #111; border: 4px solid #64748b; border-radius: 4px;
-      position: relative; box-shadow: inset 0 6px 0 #000, 0 2px 0 #334155; 
+      width: 32px; height: 32px; background: #111; border: 6px solid #64748b; border-radius: 4px;
+      position: relative; box-shadow: inset 0 6px 0 #000, 0 2px 0 #334155, 0 0 10px rgba(0,0,0,0.5); 
     }
 
-    .fog-overlay { position: absolute; inset: 0; background-color: #041011; opacity: 0.75; z-index: 20; }
+    .fog-overlay { position: absolute; inset: 0; background-color: #041011; opacity: 0.8; z-index: 20; }
 
     /* ==========================================================================
-       4. SPRITES DOS PERSONAGENS (CSS PURO RETRÔ)
+       4. SPRITES DETALHADOS (CSS PURO RETRÔ ADVANCED)
        ========================================================================== */
     .spr { position: relative; z-index: 10; display: flex; align-items: center; justify-content: center; }
     
-    /* Guerreiro (Túnica Verde, Cinto Marrom - Estilo Herói do Tempo) */
-    .spr-war { width: 22px; height: 26px; background: #4ade80; border: 2px solid #064e3b; border-radius: 6px 6px 2px 2px; box-shadow: inset -4px -4px 0 #166534; }
-    .spr-war::after { content: ''; position: absolute; top: 12px; left: -2px; width: 22px; height: 4px; background: #78350f; border: 1px solid #451a03; } /* Cinto */
-    .spr-war::before { content: ''; position: absolute; top: 4px; right: -4px; width: 6px; height: 16px; background: #cbd5e1; border: 1px solid #334155; transform: rotate(15deg); } /* Espada */
+    /* Guerreiro (Link Vibe: Túnica, Cabelo Loiro, Cinto, Lanterna Amarela) */
+    .spr-war { width: 24px; height: 28px; background: #4ade80; border: 2px solid #064e3b; border-radius: 6px 6px 2px 2px; box-shadow: inset -4px -4px 0 #166534; }
+    .spr-war::after { content: ''; position: absolute; top: -6px; left: 2px; width: 20px; height: 8px; background: #facc15; border-radius: 4px 4px 0 0; border: 1px solid #ca8a04; } /* Cabelo Texturizado */
+    .spr-war::before { content: ''; position: absolute; top: 12px; left: -2px; width: 22px; height: 4px; background: #78350f; border: 1px solid #451a03; box-shadow: 18px 2px 0 -1px #ca8a04, 18px 2px 8px -1px #fef08a; } /* Cinto e Lanterna amarela */
 
-    /* Arqueiro (Túnica Azul Escuro) */
-    .spr-arc { width: 22px; height: 26px; background: #3b82f6; border: 2px solid #1e3a8a; border-radius: 6px 6px 2px 2px; box-shadow: inset -4px -4px 0 #1d4ed8; }
-    .spr-arc::after { content: ''; position: absolute; top: 6px; left: 4px; width: 10px; height: 4px; background: #facc15; border-radius: 2px; } /* Detalhe Rosto */
+    /* Arqueiro (Túnica Azul, Capuz) */
+    .spr-arc { width: 24px; height: 28px; background: #3b82f6; border: 2px solid #1e3a8a; border-radius: 10px 10px 2px 2px; box-shadow: inset -4px -4px 0 #1d4ed8; }
+    .spr-arc::after { content: ''; position: absolute; top: 8px; left: 4px; width: 12px; height: 4px; background: #fef9c3; border-radius: 2px; } /* Rosto na sombra */
 
-    /* Explorador (Manto Vermelho) */
-    .spr-exp { width: 22px; height: 26px; background: #ef4444; border: 2px solid #7f1d1d; border-radius: 10px 10px 2px 2px; box-shadow: inset -4px -4px 0 #b91c1c; }
+    /* Explorador (Manto Vermelho Profundo) */
+    .spr-exp { width: 24px; height: 28px; background: #ef4444; border: 2px solid #7f1d1d; border-radius: 12px 12px 2px 2px; box-shadow: inset -4px -4px 0 #b91c1c; }
     
-    /* ChuChu Slime (Gelatina Verde Redonda) */
-    .spr-slime { width: 26px; height: 22px; background: #84cc16; border: 2px solid #3f6212; border-radius: 50% 50% 20% 20%; margin-top: 6px; box-shadow: inset -4px -4px 0 #4d7c0f; }
-    .spr-slime::after { content: ''; position: absolute; top: 6px; left: 6px; width: 4px; height: 4px; background: #fff; box-shadow: 10px 0 0 #fff; border-radius: 50%; }
+    /* ChuChu Slime (Verde Redondo, Olhos, Núcleo Escuro) */
+    .spr-slime { width: 28px; height: 24px; background: rgba(132, 204, 22, 0.85); border: 2px solid #3f6212; border-radius: 50% 50% 20% 20%; margin-top: 6px; box-shadow: inset -4px -4px 0 rgba(77, 124, 15, 0.85); }
+    .spr-slime::after { content: ''; position: absolute; top: 6px; left: 6px; width: 4px; height: 4px; background: #fff; box-shadow: 10px 0 0 #fff; border-radius: 50%; } /* Olhinhos */
+    .spr-slime::before { content: ''; position: absolute; top: 10px; left: 10px; width: 6px; height: 6px; background: #3f6212; border-radius: 50%; opacity: 0.5; } /* Núcleo */
 
-    /* Moblin Goblin (Porco Laranja/Vermelho) */
-    .spr-goblin { width: 24px; height: 24px; background: #f97316; border: 2px solid #9a3412; border-radius: 6px; box-shadow: inset -4px -4px 0 #c2410c; }
-    .spr-goblin::after { content: ''; position: absolute; top: 6px; left: 6px; width: 4px; height: 4px; background: #000; box-shadow: 8px 0 0 #000; } /* Olhos */
-    .spr-goblin::before { content: ''; position: absolute; top: 14px; left: 8px; width: 8px; height: 6px; background: #fdba74; border-radius: 4px; } /* Focinho */
+    /* Moblin Goblin (Porco Laranja/Vermelho, Focinho, Orelhas Pontudas) */
+    .spr-goblin { width: 26px; height: 26px; background: #f97316; border: 2px solid #9a3412; border-radius: 8px; box-shadow: inset -4px -4px 0 #c2410c; }
+    .spr-goblin::after { content: ''; position: absolute; top: 6px; left: 6px; width: 4px; height: 4px; background: #000; box-shadow: 10px 0 0 #000; } /* Olhos */
+    .spr-goblin::before { content: ''; position: absolute; top: 14px; left: 8px; width: 10px; height: 8px; background: #fdba74; border-radius: 4px; box-shadow: -8px -10px 0 -2px #c2410c, -8px -10px 0 0 #f97316, 12px -10px 0 -2px #c2410c, 12px -10px 0 0 #f97316; } /* Focinho e Orelhas Pontudas */
 
-    /* Keese Bat (Azul Escuro) */
-    .spr-bat { width: 32px; height: 12px; background: #1e1b4b; border: 2px solid #000; border-radius: 50%; box-shadow: inset -2px -4px 0 #312e81; }
-    .spr-bat::after { content: ''; position: absolute; top: 2px; left: 10px; width: 2px; height: 2px; background: #fca5a5; box-shadow: 8px 0 0 #fca5a5; }
+    /* Keese Bat (Azul Indigo, Olhos Vermelhos) */
+    .spr-bat { width: 34px; height: 14px; background: #1e1b4b; border: 2px solid #000; border-radius: 50%; box-shadow: inset -2px -4px 0 #312e81; }
+    .spr-bat::after { content: ''; position: absolute; top: 2px; left: 11px; width: 2px; height: 2px; background: #ef4444; box-shadow: 10px 0 0 #ef4444; }
 
-    /* Itens (Coração ao invés de Maçã) */
-    .spr-fruit { width: 16px; height: 16px; background: #ef4444; border: 2px solid #7f1d1d; border-radius: 50% 50% 2px 2px; position: relative; box-shadow: inset -2px -2px 0 #b91c1c; transform: rotate(45deg); margin-top: 4px; }
-    .spr-fruit::before { content:''; position:absolute; top:0; left:-8px; width:16px; height:16px; background:inherit; border:inherit; border-right:none; border-radius: 50% 0 0 50%; box-shadow: inset -2px -2px 0 #b91c1c; }
-    .spr-blood { width: 20px; height: 10px; background: #991b1b; border-radius: 50%; opacity: 0.8; }
+    /* Coração Clássico (Zelda Vibe) */
+    .spr-fruit { width: 18px; height: 18px; background: #ef4444; border: 2px solid #7f1d1d; border-radius: 50% 50% 2px 2px; position: relative; box-shadow: inset -2px -2px 0 #b91c1c; transform: rotate(45deg); margin-top: 4px; }
+    .spr-fruit::before { content:''; position:absolute; top:0; left:-10px; width:18px; height:18px; background:inherit; border:inherit; border-right:none; border-radius: 50% 0 0 50%; box-shadow: inset -2px -2px 0 #b91c1c; }
+    .spr-blood { width: 22px; height: 12px; background: #991b1b; border-radius: 50%; opacity: 0.8; }
   </style>
 </head>
 <body class="select-none">
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
     const CLASSES = [
       { id: 'war', name: 'GUERREIRO', iconClass: 'spr-war', desc: 'Espada varre 3 blocos em arco.', stats: { hp: 70, max: 70, atk: 5, range: 1, vis: 5, def: 2 } },
@@ -201,20 +207,29 @@
       const [offered, setOffered] = useState([]);
       const [showMilestones, setShowMilestones] = useState(false);
       const [scale, setScale] = useState(1);
+      const gameContainerRef = useRef(null);
       
       const [meta, setMeta] = useState(() => {
         try {
-          const saved = localStorage.getItem('bw_meta_zelda');
+          const saved = localStorage.getItem('bw_meta_zelda_v2');
           return saved ? JSON.parse(saved) : { totalKills: 0, maxFloor: 0, maxLevel: 0, legacyHP: 0, legacyATK: 0, legacyPowers: [] };
         } catch(e) { return { totalKills: 0, maxFloor: 0, maxLevel: 0, legacyHP: 0, legacyATK: 0, legacyPowers: [] }; }
       });
 
+      // Lógica de adaptabilidade total à janela
       useEffect(() => {
         const handleResize = () => {
-          const gameW = 1400; const gameH = 700;
-          const sw = window.innerWidth / gameW;
-          const sh = window.innerHeight / gameH;
-          setScale(Math.min(sw, sh, 1.0)); 
+          if (!gameContainerRef.current) return;
+          const containerW = window.innerWidth * 0.9;
+          const containerH = window.innerHeight * 0.9;
+          
+          // O tamanho "nativo" do jogo (área do mapa + HUD lateral)
+          const nativeW = 1400; 
+          const nativeH = 700;
+          
+          const sw = containerW / nativeW;
+          const sh = containerH / nativeH;
+          setScale(Math.min(sw, sh, 1.0)); // Adapta, mas não ultrapassa 1.0
         };
         handleResize();
         window.addEventListener('resize', handleResize);
@@ -290,11 +305,11 @@
           
           if (killedAny) {
             const newMeta = { ...meta, totalKills: meta.totalKills + numKills };
-            setMeta(newMeta); localStorage.setItem('bw_meta_zelda', JSON.stringify(newMeta));
+            setMeta(newMeta); localStorage.setItem('bw_meta_zelda_v2', JSON.stringify(newMeta));
             let nXp = p.xp + totalXpGained;
             if (nXp >= p.lvl * 40) { 
                nXp -= (p.lvl * 40); setFlashKey(k => k + 1); const nLvl = p.lvl + 1;
-               if (nLvl > meta.maxLevel) setMeta(m => { const nm = {...m, maxLevel: nLvl}; localStorage.setItem('bw_meta_zelda', JSON.stringify(nm)); return nm;});
+               if (nLvl > meta.maxLevel) setMeta(m => { const nm = {...m, maxLevel: nLvl}; localStorage.setItem('bw_meta_zelda_v2', JSON.stringify(nm)); return nm;});
                setP(v => ({...v, xp: nXp, lvl: nLvl, sp: v.sp + 1, f: nf}));
             } else setP(v => ({...v, xp: nXp, f: nf}));
             setCombo(c => c + 1);
@@ -306,7 +321,7 @@
         if (!cell || cell.t === 'wall') { setP(v => ({...v, f: nf})); return; }
         if (cell.t === 'stairs') {
           const nF = floor + 1; setFloor(nF);
-          if (nF > meta.maxFloor) setMeta(m => { const nm = {...m, maxFloor: nF}; localStorage.setItem('bw_meta_zelda', JSON.stringify(nm)); return nm;});
+          if (nF > meta.maxFloor) setMeta(m => { const nm = {...m, maxFloor: nF}; localStorage.setItem('bw_meta_zelda_v2', JSON.stringify(nm)); return nm;});
           const regen = activePowers.find(i => i.id === 'hp_reg');
           let healedHp = p.hp;
           if (regen) healedHp = Math.min(p.max, p.hp + Math.floor(p.max * (0.05 * regen.lvl)));
@@ -358,7 +373,7 @@
         
         if (latestP.hp - dmg <= 0) {
           const finalMeta = { ...meta, legacyHP: latestP.max - charClass.stats.max, legacyATK: latestP.atk - charClass.stats.atk, legacyPowers: activePowers };
-          setMeta(finalMeta); localStorage.setItem('bw_meta_zelda', JSON.stringify(finalMeta));
+          setMeta(finalMeta); localStorage.setItem('bw_meta_zelda_v2', JSON.stringify(finalMeta));
           setIsDead(true);
         }
         setP(v => ({ ...v, hp: v.hp - dmg }));
@@ -396,9 +411,9 @@
         return null;
       };
 
-      // MENU INICIAL
+      // TELA INICIAL
       if (!charClass || !p) return (
-        <div id="scale-wrapper" style={{transform: `scale(${scale})`}} className="flex flex-col items-center justify-center p-6 w-[1400px] h-[700px]">
+        <div className="flex flex-col items-center justify-center p-6 w-full h-full">
           <h1 className="text-[100px] font-black text-[#fcd34d] mb-8 uppercase tracking-tighter drop-shadow-[0_6px_0_#b45309]">BLACKWOOD</h1>
           
           <div className="mb-10 p-6 zelda-panel w-full max-w-xl">
@@ -408,12 +423,6 @@
               <div className="w-1 h-12 bg-[#fcd34d] opacity-30"></div>
               <div className="text-center"><p className="text-blue-400 font-black text-5xl">+{meta.legacyATK || 0}</p><p className="text-sm uppercase opacity-70">Força de Ataque</p></div>
             </div>
-            {meta.legacyPowers?.length > 0 && <div className="mt-6 border-t-2 border-[#fcd34d] pt-6 text-center"><div className="flex flex-wrap justify-center gap-3">
-              {meta.legacyPowers.map(pow => {
-                const pData = POWER_CATALOG.find(x=>x.id===pow.id);
-                return pData ? <span key={pow.id} className={`zelda-panel-dark px-3 py-1 text-sm bg-black/60`}>{pData.icon} {pData.name} N{pow.lvl}</span> : null;
-              })}
-            </div></div>}
           </div>
 
           <div className="flex gap-6 mb-12">
@@ -447,82 +456,78 @@
         </div>
       );
 
-      // TELA DE JOGO
+      // TELA DE JOGO RESPONSIVA
       return (
         <>
           {flashKey > 0 && <div key={`flash-${flashKey}`} className="pointer-events-none fixed inset-0 z-[999] flash-lvl"></div>}
-          <div id="scale-wrapper" style={{transform: `scale(${scale})`}} className="w-[1400px] h-[700px] flex items-center justify-center relative">
-            <div key={`shake-${shakeKey}`} className={`flex gap-10 items-start ${shakeKey > 0 ? 'shake-fx' : ''}`}>
-              
-              <div className="map-container relative">
-                {map.map((row, y) => (
-                  <div key={y} className="flex">
-                    {row.map((c, x) => {
-                      const vis = calcVis(x, y, p); 
-                      if (!vis && !c.v) return <div key={x} className="tile bg-[#041011]"></div>
-                      
-                      const isWall = c.t === 'wall';
-                      const isStairs = c.t === 'stairs';
-                      let tileClass = isWall ? 'tile-tree' : (isStairs ? 'tile-stairs' : 'tile-grass');
-                      
-                      return (
-                        <div key={x} className={`tile ${tileClass}`}>
-                          {renderTileContent(c, x, y, vis)}
-                          {c.e && vis && c.e.hp < c.e.maxHp && !isNaN(c.e.hp) && (
-                            <div className="absolute -top-2 left-1 right-1 zelda-panel-dark p-[2px] z-20"><div className="h-1.5 bg-red-500" style={{width:`${Math.max(0, (c.e.hp/c.e.maxHp)*100)}%`}}></div></div>
-                          )}
-                          {!vis && c.v && <div className="fog-overlay"></div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-
-              <div className="w-[360px] flex flex-col gap-6">
-                <div className="zelda-panel p-6">
-                  <div className="flex justify-between text-red-400 uppercase font-black text-lg mb-2"><span>Vida</span><span>{Math.max(0, p.hp)}/{p.max}</span></div>
-                  <div className="w-full bg-[#111] h-6 zelda-panel-dark mb-8"><div className="hp-bar-solid h-full" style={{width:`${Math.min(100, Math.max(0,(p.hp/p.max)*100))}%`}}></div></div>
-                  
-                  <div className="zelda-panel-dark p-4 text-center mb-8">
-                     <p className="text-[#fcd34d] text-base uppercase font-black tracking-widest mb-3">Mochila {inventory.length}/3 | Combo {combo}/3</p>
-                     <div className="flex justify-center gap-4 h-8 items-center mb-3">
-                      {inventory.map((_,i)=><div key={i} className="spr-fruit"></div>)}
-                      {inventory.length===0 && <span className="opacity-30 text-lg uppercase font-bold">Vazia</span>}
-                     </div>
-                     <p className="text-white text-sm animate-pulse font-bold mt-2">[H] USAR CORAÇÃO</p>
-                  </div>
-
-                  <div className="flex justify-between text-blue-400 uppercase font-black text-lg mb-2"><span>Nível {p.lvl}</span><span>{Math.floor(p.xp)}/{(p.lvl*40)}</span></div>
-                  <div className="w-full bg-[#111] h-6 zelda-panel-dark mb-6"><div className="xp-bar-solid h-full" style={{width:`${Math.min(100, Math.max(0,(p.xp/(p.lvl*40))*100))}%`}}></div></div>
-                  
-                  {activePowers.length > 0 && <div className="flex flex-wrap gap-2 justify-center border-t-2 border-[#fcd34d] pt-6">
-                      {activePowers.map(i => {
-                        const pData = POWER_CATALOG.find(d=>d.id===i.id);
-                        return pData ? <div key={i.id} className={`zelda-panel-dark px-2 py-1 text-sm font-bold bg-black/60`}>{pData.icon} N{i.lvl}</div> : null;
+          <div id="responsive-game-container" ref={gameContainerRef}>
+            <div id="scale-wrapper" style={{transform: `scale(${scale})`}} className="flex gap-10 items-start">
+              <div key={`shake-${shakeKey}`} className={`flex gap-10 items-start ${shakeKey > 0 ? 'shake-fx' : ''}`}>
+                
+                <div className="map-container relative">
+                  {map.map((row, y) => (
+                    <div key={y} className="flex overflow-visible">
+                      {row.map((c, x) => {
+                        const vis = calcVis(x, y, p); 
+                        if (!vis && !c.v) return <div key={x} className="tile bg-[#041011]"></div>
+                        
+                        const isWall = c.t === 'wall';
+                        const isStairs = c.t === 'stairs';
+                        let tileClass = isWall ? 'tile-tree' : (isStairs ? 'tile-stairs' : 'tile-grass');
+                        
+                        return (
+                          <div key={x} className={`tile ${tileClass}`}>
+                            {renderTileContent(c, x, y, vis)}
+                            {c.e && vis && c.e.hp < c.e.maxHp && !isNaN(c.e.hp) && (
+                              <div className="absolute -top-2 left-1 right-1 zelda-panel-dark p-[2px] z-20"><div className="h-1.5 bg-red-500" style={{width:`${Math.max(0, (c.e.hp/c.e.maxHp)*100)}%`}}></div></div>
+                            )}
+                            {!vis && c.v && <div className="fog-overlay"></div>}
+                          </div>
+                        );
                       })}
-                    </div>}
+                    </div>
+                  ))}
                 </div>
 
-                <div className="zelda-panel p-6 flex flex-col items-center">
-                  <div className="grid gap-[1px] bg-[#111] p-2 zelda-panel-dark" style={{gridTemplateColumns: `repeat(${MAP_W}, 1fr)`}}>
-                    {map.map((row, y) => row.map((c, x) => {
-                      let col = "bg-transparent";
-                      if (c.v) {
-                        if (p.x===x && p.y===y) col = "bg-[#4ade80]";
-                        else if (c.e && c.e.type !== 'fruit' && calcVis(x,y,p)) col = "bg-red-500";
-                        else if (c.t==='stairs') col = "bg-yellow-400";
-                        else if (c.t==='wall') col = "bg-[#1b5e20]";
-                        else col = "bg-slate-700";
-                      }
-                      return <div key={`${x}-${y}`} className={`w-2 h-2 ${col}`}></div>;
-                    }))}
+                <div className="w-[360px] flex flex-col gap-6">
+                  <div className="zelda-panel p-6">
+                    <div className="flex justify-between text-red-400 uppercase font-black text-lg mb-2"><span>Vida</span><span>{Math.max(0, p.hp)}/{p.max}</span></div>
+                    <div className="w-full bg-[#111] h-6 zelda-panel-dark mb-8"><div className="hp-bar-solid h-full" style={{width:`${Math.min(100, Math.max(0,(p.hp/p.max)*100))}%`}}></div></div>
+                    
+                    <div className="zelda-panel-dark p-4 text-center mb-8">
+                       <p className="text-[#fcd34d] text-base uppercase font-black tracking-widest mb-3">Mochila {inventory.length}/3 | Combo {combo}/3</p>
+                       <div className="flex justify-center gap-4 h-8 items-center mb-3 overflow-visible">
+                        {inventory.map((_,i)=><div key={i} className="spr-fruit"></div>)}
+                        {inventory.length===0 && <span className="opacity-30 text-lg uppercase font-bold">Vazia</span>}
+                       </div>
+                       <p className="text-white text-sm animate-pulse font-bold mt-2">[H] USAR CORAÇÃO</p>
+                    </div>
+
+                    <div className="flex justify-between text-blue-400 uppercase font-black text-lg mb-2"><span>Nível {p.lvl}</span><span>{Math.floor(p.xp)}/{(p.lvl*40)}</span></div>
+                    <div className="w-full bg-[#111] h-6 zelda-panel-dark mb-6"><div className="xp-bar-solid h-full" style={{width:`${Math.min(100, Math.max(0,(p.xp/(p.lvl*40))*100))}%`}}></div></div>
                   </div>
-                  <div className="mt-4 text-xl uppercase font-bold text-[#fcd34d] tracking-widest text-center">Andar {floor}</div>
+
+                  <div className="zelda-panel p-6 flex flex-col items-center">
+                    <div className="grid gap-[1px] bg-[#111] p-2 zelda-panel-dark" style={{gridTemplateColumns: `repeat(${MAP_W}, 1fr)`}}>
+                      {map.map((row, y) => row.map((c, x) => {
+                        let col = "bg-transparent";
+                        if (c.v) {
+                          if (p.x===x && p.y===y) col = "bg-[#4ade80]";
+                          else if (c.e && c.e.type !== 'fruit' && calcVis(x,y,p)) col = "bg-red-500";
+                          else if (c.t==='stairs') col = "bg-yellow-400";
+                          else if (c.t==='wall') col = "bg-[#1b5e20]";
+                          else col = "bg-slate-700";
+                        }
+                        return <div key={`${x}-${y}`} className={`w-2 h-2 ${col}`}></div>;
+                      }))}
+                    </div>
+                    <div className="mt-4 text-xl uppercase font-bold text-[#fcd34d] tracking-widest text-center">Andar {floor}</div>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Overlays (Modal) */}
             {offered.length > 0 && (
               <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[150] p-6">
                 <div className="zelda-panel p-12 text-center max-w-4xl w-full shadow-[0_0_100px_rgba(252,211,77,0.2)]">
